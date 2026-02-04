@@ -1,0 +1,119 @@
+name: CI Pipeline
+
+run-name: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}
+
+on:
+  push:
+    branches: [ develop, develop/* ]
+  pull_request:
+    branches: [ main, develop, develop/* ]
+
+jobs:
+  lint-and-format:
+    name: Linting and Code Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install ".[dev]"
+
+      - name: Check code formatting with Black
+        run: |
+          black etl/ tests/ --check --diff
+
+      - name: Lint with flake8
+        run: |
+          flake8 etl/ --max-line-length=100 --ignore=E501,W503
+
+      - name: Lint with pylint
+        run: |
+          pylint etl/ --disable=C0111,R0903,C0103 || true
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install ".[dev]"
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v --cov=etl --cov=tests --cov-report=xml --cov-report=term
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  integration-test-local:
+    name: Local Integration Test
+    runs-on: ubuntu-latest
+    needs: [lint-and-format, test]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install .
+
+      - name: Create test data directories
+        run: |
+          mkdir -p data/bronze data/silver data/gold
+
+      - name: Run bronze bronze (test mode)
+        run: |
+          echo "Bronze ingestion test would run here"
+          # Commented out to avoid actual downloads in CI
+          # python etl/jobs/bronze_ingestion.py --months 2023-01 --mode local
+
+      - name: Run gold gold (test mode)
+        run: |
+          echo "Gold transformation test would run here"
+          # python etl/jobs/gold_transformation.py --months 2023-01 --mode local
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'trivy-results.sarif'

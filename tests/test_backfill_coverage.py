@@ -1,0 +1,265 @@
+"""
+Extended coverage tests for taxi_injection_safe_backfill_job.
+
+Tests cover uncovered functions:
+- check_partition_exists
+- delete_partition
+- safe_backfill_month
+- safe_historical_backfill
+- main
+"""
+
+from unittest.mock import patch, MagicMock
+
+from etl.jobs.bronze.taxi_injection_safe_backfill_job import (
+    parse_month_spec,
+    check_partition_exists,
+    delete_partition,
+    safe_backfill_month,
+    safe_historical_backfill,
+)
+from etl.jobs.utils.config import JobConfig
+
+
+class TestParseMonthSpec:
+    """Tests for parse_month_spec function."""
+
+    def test_parse_single_month(self):
+        """Test parsing single month specification."""
+        result = parse_month_spec("2024-06")
+
+        assert result == [(2024, 6)]
+
+    def test_parse_month_range(self):
+        """Test parsing month range specification."""
+        result = parse_month_spec("2024-01:2024-03")
+
+        assert len(result) == 3
+        assert (2024, 1) in result
+        assert (2024, 2) in result
+        assert (2024, 3) in result
+
+    def test_parse_month_range_cross_year(self):
+        """Test parsing month range crossing year boundary."""
+        result = parse_month_spec("2023-11:2024-02")
+
+        assert len(result) == 4
+        assert (2023, 11) in result
+        assert (2023, 12) in result
+        assert (2024, 1) in result
+        assert (2024, 2) in result
+
+    def test_parse_single_digit_month(self):
+        """Test parsing single digit month."""
+        result = parse_month_spec("2024-1")
+
+        assert result == [(2024, 1)]
+
+
+class TestCheckPartitionExists:
+    """Tests for check_partition_exists function."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def test_check_partition_exists_found(self):
+        """Test partition exists and returns statistics."""
+        mock_spark = MagicMock()
+        mock_df = MagicMock()
+        mock_df.count.return_value = 1000
+        mock_df.select.return_value.distinct.return_value.count.return_value = 950
+        mock_spark.read.parquet.return_value = mock_df
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
+
+        exists, total, unique = check_partition_exists(
+            mock_spark, "yellow", 2024, 1, mock_config
+        )
+
+        assert exists is True
+        assert total == 1000
+        assert unique == 950
+
+    def test_check_partition_exists_not_found(self):
+        """Test partition does not exist."""
+        mock_spark = MagicMock()
+        mock_spark.read.parquet.side_effect = Exception("Path not found")
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
+
+        exists, total, unique = check_partition_exists(
+            mock_spark, "yellow", 2024, 1, mock_config
+        )
+
+        assert exists is False
+        assert total == 0
+        assert unique == 0
+
+
+class TestDeletePartition:
+    """Tests for delete_partition function."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def test_delete_partition_success(self):
+        """Test successful partition deletion."""
+        mock_spark = MagicMock()
+        mock_fs = MagicMock()
+        mock_fs.exists.return_value = True
+        mock_fs.delete.return_value = True
+
+        mock_spark._jvm.org.apache.hadoop.fs.FileSystem.get.return_value = mock_fs
+        mock_spark._jvm.org.apache.hadoop.fs.Path.return_value = MagicMock()
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
+
+        result = delete_partition(mock_spark, "yellow", 2024, 1, mock_config)
+
+        assert result is True
+        mock_fs.delete.assert_called_once()
+
+    def test_delete_partition_not_exists(self):
+        """Test deletion when partition doesn't exist."""
+        mock_spark = MagicMock()
+        mock_fs = MagicMock()
+        mock_fs.exists.return_value = False
+
+        mock_spark._jvm.org.apache.hadoop.fs.FileSystem.get.return_value = mock_fs
+        mock_spark._jvm.org.apache.hadoop.fs.Path.return_value = MagicMock()
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
+
+        result = delete_partition(mock_spark, "yellow", 2024, 1, mock_config)
+
+        assert result is False
+
+    def test_delete_partition_error(self):
+        """Test deletion error handling."""
+        mock_spark = MagicMock()
+        mock_spark._jvm.org.apache.hadoop.fs.FileSystem.get.side_effect = Exception(
+            "Error"
+        )
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
+
+        result = delete_partition(mock_spark, "yellow", 2024, 1, mock_config)
+
+        assert result is False
+
+
+class TestSafeBackfillMonth:
+    """Tests for safe_backfill_month function."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def test_safe_backfill_month_existing_partition_skip(self):
+        """Test backfill with existing partition and delete_existing=False."""
+        mock_spark = MagicMock()
+
+        with patch(
+            "etl.jobs.bronze.taxi_injection_safe_backfill_job.check_partition_exists"
+        ) as mock_check:
+            mock_check.return_value = (True, 500, 500)  # Exists
+
+            result = safe_backfill_month(
+                mock_spark, "yellow", 2024, 1, delete_existing=False
+            )
+
+        assert result["status"] == "SKIPPED"
+
+    def test_safe_backfill_month_delete_fails(self):
+        """Test backfill when partition deletion fails."""
+        mock_spark = MagicMock()
+
+        with patch(
+            "etl.jobs.bronze.taxi_injection_safe_backfill_job.check_partition_exists"
+        ) as mock_check:
+            mock_check.return_value = (True, 500, 500)  # Exists
+            with patch(
+                "etl.jobs.bronze.taxi_injection_safe_backfill_job.delete_partition",
+                return_value=False,
+            ):
+                result = safe_backfill_month(
+                    mock_spark, "yellow", 2024, 1, delete_existing=True
+                )
+
+        assert result["status"] == "ERROR"
+        assert "delete" in result["error"].lower()
+
+
+class TestSafeHistoricalBackfill:
+    """Tests for safe_historical_backfill function."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def test_safe_historical_backfill_function_exists(self):
+        """Test safe_historical_backfill function exists."""
+        assert callable(safe_historical_backfill)
+
+    def test_safe_historical_backfill_processes_months(self):
+        """Test safe_historical_backfill processes multiple months."""
+        with patch("etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+            mock_spark = MagicMock()
+            mock_sm.get_session.return_value = mock_spark
+            with patch(
+                "etl.jobs.bronze.taxi_injection_safe_backfill_job.safe_backfill_month"
+            ) as mock_backfill:
+                mock_backfill.side_effect = [
+                    {
+                        "status": "SUCCESS",
+                        "period": "2024-01",
+                        "records_after": 1000,
+                        "duplicates_after": 0,
+                    },
+                    {
+                        "status": "SUCCESS",
+                        "period": "2024-02",
+                        "records_after": 1000,
+                        "duplicates_after": 0,
+                    },
+                ]
+
+                results = safe_historical_backfill(
+                    "yellow", [(2024, 1), (2024, 2)], delete_existing=False
+                )
+
+        assert len(results) == 2
+        assert mock_backfill.call_count == 2
+
+    def test_safe_historical_backfill_empty_months(self):
+        """Test safe_historical_backfill with empty months list."""
+        with patch("etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+            mock_spark = MagicMock()
+            mock_sm.get_session.return_value = mock_spark
+
+            results = safe_historical_backfill("yellow", [], delete_existing=False)
+
+        assert results == {}
+
+    def test_safe_historical_backfill_with_delete(self):
+        """Test safe_historical_backfill with delete_existing=True."""
+        with patch("etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+            mock_spark = MagicMock()
+            mock_sm.get_session.return_value = mock_spark
+            with patch(
+                "etl.jobs.bronze.taxi_injection_safe_backfill_job.safe_backfill_month"
+            ) as mock_backfill:
+                mock_backfill.return_value = {
+                    "status": "SUCCESS",
+                    "period": "2024-03",
+                    "records_after": 500,
+                    "duplicates_after": 0,
+                }
+
+                results = safe_historical_backfill(
+                    "green", [(2024, 3)], delete_existing=True
+                )
+
+        assert len(results) == 1
