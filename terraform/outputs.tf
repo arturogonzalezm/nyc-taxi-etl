@@ -1,11 +1,11 @@
 output "project_id" {
   description = "The GCP project ID"
-  value       = google_project.nyc_taxi_project.project_id
+  value       = data.google_project.nyc_taxi_project.project_id
 }
 
 output "project_number" {
   description = "The GCP project number"
-  value       = google_project.nyc_taxi_project.number
+  value       = data.google_project.nyc_taxi_project.number
 }
 
 output "service_account_email" {
