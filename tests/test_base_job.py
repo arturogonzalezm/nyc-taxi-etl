@@ -8,6 +8,7 @@ import logging
 
 from etl.jobs.base_job import BaseSparkJob, JobExecutionError
 from etl.jobs.utils.config import JobConfig
+from etl.jobs.utils.spark_manager import SparkSessionManager
 
 
 class TestJobExecutionError:
@@ -274,3 +275,283 @@ class TestBaseSparkJobAbstractMethods:
 
         with pytest.raises(TypeError):
             IncompleteJob("test")
+
+
+class TestBaseSparkJobRun:
+    """Tests for BaseSparkJob.run method."""
+
+    def setup_method(self):
+        JobConfig.reset()
+
+    def teardown_method(self):
+        JobConfig.reset()
+
+    def test_run_success_returns_true(self):
+        """Test run() returns True on successful execution."""
+        job = ConcreteTestJob("test_run_success")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            result = job.run()
+            assert result is True
+
+    def test_run_calls_all_etl_steps(self):
+        """Test run() calls validate, extract, transform, load in order."""
+        job = ConcreteTestJob("test_run_steps")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            job.run()
+            assert job.validate_called is True
+            assert job.extract_called is True
+            assert job.transform_called is True
+            assert job.load_called is True
+
+    def test_run_sets_success_metrics(self):
+        """Test run() sets SUCCESS status in metrics on success."""
+        job = ConcreteTestJob("test_run_metrics")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            job.run()
+            metrics = job.get_metrics()
+            assert metrics["status"] == "SUCCESS"
+            assert "total_duration_seconds" in metrics
+            assert metrics["job_name"] == "test_run_metrics"
+
+    def test_run_sets_start_time_in_metrics(self):
+        """Test run() sets start_time in metrics."""
+        job = ConcreteTestJob("test_start_time")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            job.run()
+            metrics = job.get_metrics()
+            assert "start_time" in metrics
+
+    def test_run_extract_returns_none_raises_error(self):
+        """Test run() raises JobExecutionError when extract returns None."""
+
+        class NoneExtractJob(BaseSparkJob):
+            def validate_inputs(self):
+                pass
+
+            def extract(self):
+                return None
+
+            def transform(self, df):
+                return df
+
+            def load(self, df):
+                pass
+
+        job = NoneExtractJob("test_none_extract")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            with pytest.raises(JobExecutionError, match="Extract step returned None"):
+                job.run()
+
+    def test_run_transform_returns_none_raises_error(self):
+        """Test run() raises JobExecutionError when transform returns None."""
+
+        class NoneTransformJob(BaseSparkJob):
+            def validate_inputs(self):
+                pass
+
+            def extract(self):
+                return Mock()
+
+            def transform(self, df):
+                return None
+
+            def load(self, df):
+                pass
+
+        job = NoneTransformJob("test_none_transform")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            with pytest.raises(JobExecutionError, match="Transform step returned None"):
+                job.run()
+
+    def test_run_sets_error_metrics_on_failure(self):
+        """Test run() sets error metrics when job fails."""
+
+        class FailingJob(BaseSparkJob):
+            def validate_inputs(self):
+                raise ValueError("Validation failed")
+
+            def extract(self):
+                return Mock()
+
+            def transform(self, df):
+                return df
+
+            def load(self, df):
+                pass
+
+        job = FailingJob("test_error_metrics")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            with pytest.raises(JobExecutionError):
+                job.run()
+            metrics = job.get_metrics()
+            assert metrics["status"] == "FAILED"
+            assert "error_message" in metrics
+            assert "error_type" in metrics
+
+    def test_run_calls_cleanup_on_success(self):
+        """Test run() calls cleanup on successful execution."""
+        job = ConcreteTestJob("test_cleanup_success")
+        job.cleanup_called = False
+
+        def mark_cleanup():
+            job.cleanup_called = True
+
+        job.cleanup = mark_cleanup
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            job.run()
+            assert job.cleanup_called is True
+
+    def test_run_calls_cleanup_on_failure(self):
+        """Test run() calls cleanup even when job fails."""
+
+        class FailingJob(BaseSparkJob):
+            cleanup_called = False
+
+            def validate_inputs(self):
+                raise ValueError("Fail")
+
+            def extract(self):
+                return Mock()
+
+            def transform(self, df):
+                return df
+
+            def load(self, df):
+                pass
+
+            def cleanup(self):
+                self.cleanup_called = True
+
+        job = FailingJob("test_cleanup_failure")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            with pytest.raises(JobExecutionError):
+                job.run()
+            assert job.cleanup_called is True
+
+    def test_run_wraps_non_job_execution_error(self):
+        """Test run() wraps non-JobExecutionError in JobExecutionError."""
+
+        class TypeErrorJob(BaseSparkJob):
+            def validate_inputs(self):
+                raise TypeError("Type error")
+
+            def extract(self):
+                return Mock()
+
+            def transform(self, df):
+                return df
+
+            def load(self, df):
+                pass
+
+        job = TypeErrorJob("test_wrap_error")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            with pytest.raises(JobExecutionError) as exc_info:
+                job.run()
+            assert "Type error" in str(exc_info.value)
+            assert exc_info.value.__cause__ is not None
+
+    def test_run_reraises_job_execution_error(self):
+        """Test run() re-raises JobExecutionError without wrapping."""
+
+        class JobErrorJob(BaseSparkJob):
+            def validate_inputs(self):
+                raise JobExecutionError("Direct job error")
+
+            def extract(self):
+                return Mock()
+
+            def transform(self, df):
+                return df
+
+            def load(self, df):
+                pass
+
+        job = JobErrorJob("test_reraise")
+        with patch.object(
+            SparkSessionManager, "get_session", return_value=MagicMock()
+        ):
+            with pytest.raises(JobExecutionError, match="Direct job error"):
+                job.run()
+
+
+class TestBaseSparkJobTrackMetrics:
+    """Tests for BaseSparkJob._track_metrics context manager."""
+
+    def setup_method(self):
+        JobConfig.reset()
+
+    def teardown_method(self):
+        JobConfig.reset()
+
+    def test_track_metrics_records_duration(self):
+        """Test _track_metrics records step duration."""
+        job = ConcreteTestJob("test_track_duration")
+        with job._track_metrics("test_step"):
+            pass
+        assert "test_step_duration_seconds" in job._metrics
+        assert isinstance(job._metrics["test_step_duration_seconds"], float)
+
+    def test_track_metrics_records_duration_on_exception(self):
+        """Test _track_metrics records duration even when exception occurs."""
+        job = ConcreteTestJob("test_track_exception")
+        try:
+            with job._track_metrics("failing_step"):
+                raise ValueError("Test error")
+        except ValueError:
+            pass
+        assert "failing_step_duration_seconds" in job._metrics
+
+
+class TestBaseSparkJobCleanupWithSpark:
+    """Tests for BaseSparkJob.cleanup with Spark session."""
+
+    def setup_method(self):
+        JobConfig.reset()
+
+    def teardown_method(self):
+        JobConfig.reset()
+
+    def test_cleanup_logs_message(self):
+        """Test cleanup logs cleanup message."""
+        job = ConcreteTestJob("test_cleanup_spark")
+        # Should not raise and should log
+        job.cleanup()
+
+    def test_cleanup_handles_no_spark_session(self):
+        """Test cleanup handles case when spark is None."""
+        job = ConcreteTestJob("test_cleanup_no_spark")
+        job.spark = None
+        # Should not raise
+        job.cleanup()
+
+    def test_cleanup_handles_exception_gracefully(self):
+        """Test cleanup handles exceptions without raising."""
+        job = ConcreteTestJob("test_cleanup_exception")
+        # Mock logger to raise exception
+        job.logger = MagicMock()
+        job.logger.info.side_effect = Exception("Logger error")
+        job.logger.warning = MagicMock()
+        # Should not raise, should log warning
+        job.cleanup()
+        job.logger.warning.assert_called_once()

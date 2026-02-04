@@ -242,3 +242,324 @@ class TestRunIngestionFunction:
         with patch.object(TaxiIngestionJob, "run", return_value=False):
             result = run_ingestion("yellow", 2024, 1)
             assert result is False
+
+
+class TestTaxiIngestionJobExtractWithLocalCache:
+    """Tests for TaxiIngestionJob._extract_with_local_cache method."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def teardown_method(self):
+        """Reset JobConfig singleton after each test."""
+        JobConfig.reset()
+
+    def test_extract_cache_miss_downloads_file(self, tmp_path):
+        """Test extract downloads file when not in cache."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        job.spark = MagicMock()
+        job.config._cache_dir = tmp_path
+
+        with patch.object(job, "_download_file") as mock_download:
+            job._extract_with_local_cache("http://example.com/file.parquet")
+            mock_download.assert_called_once()
+
+    def test_extract_cache_hit_skips_download(self, tmp_path):
+        """Test extract skips download when file exists in cache."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        job.spark = MagicMock()
+        job.config._cache_dir = tmp_path
+
+        # Create cached file
+        cache_file = tmp_path / job.file_name
+        cache_file.write_text("cached data")
+
+        with patch.object(job, "_download_file") as mock_download:
+            job._extract_with_local_cache("http://example.com/file.parquet")
+            mock_download.assert_not_called()
+
+    def test_extract_download_failure_raises_download_error(self, tmp_path):
+        """Test extract raises DownloadError when download fails."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        job.spark = MagicMock()
+        job.config._cache_dir = tmp_path
+
+        with patch.object(
+            job, "_download_file", side_effect=Exception("Network error")
+        ):
+            with pytest.raises(DownloadError, match="Failed to download"):
+                job._extract_with_local_cache("http://example.com/file.parquet")
+
+    def test_extract_read_failure_raises_job_execution_error(self, tmp_path):
+        """Test extract raises JobExecutionError when parquet read fails."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        job.spark = MagicMock()
+        job.spark.read.parquet.side_effect = Exception("Read error")
+        job.config._cache_dir = tmp_path
+
+        # Create cached file
+        cache_file = tmp_path / job.file_name
+        cache_file.write_text("invalid parquet")
+
+        with pytest.raises(JobExecutionError, match="Failed to read parquet"):
+            job._extract_with_local_cache("http://example.com/file.parquet")
+
+
+class TestTaxiIngestionJobDownloadFile:
+    """Tests for TaxiIngestionJob._download_file method."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def teardown_method(self):
+        """Reset JobConfig singleton after each test."""
+        JobConfig.reset()
+
+    def test_download_file_success(self, tmp_path):
+        """Test successful file download."""
+        import requests
+
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        destination = tmp_path / "test_file.parquet"
+
+        mock_response = MagicMock()
+        mock_response.headers = {"content-length": "100"}
+        mock_response.iter_content.return_value = [b"test data"]
+
+        with patch.object(requests, "get", return_value=mock_response):
+            job._download_file("http://example.com/file.parquet", destination)
+            assert destination.exists()
+            assert destination.read_bytes() == b"test data"
+
+    def test_download_file_timeout_raises_error(self, tmp_path):
+        """Test download timeout raises DownloadError."""
+        import requests
+
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        destination = tmp_path / "test_file.parquet"
+
+        with patch.object(
+            requests, "get", side_effect=requests.exceptions.Timeout("Timeout")
+        ):
+            with pytest.raises(DownloadError, match="Download timeout"):
+                job._download_file("http://example.com/file.parquet", destination)
+
+    def test_download_file_http_error_raises_error(self, tmp_path):
+        """Test HTTP error raises DownloadError."""
+        import requests
+
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        destination = tmp_path / "test_file.parquet"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        http_error = requests.exceptions.HTTPError(response=mock_response)
+
+        with patch.object(requests, "get", side_effect=http_error):
+            with pytest.raises(DownloadError, match="HTTP error"):
+                job._download_file("http://example.com/file.parquet", destination)
+
+    def test_download_file_request_exception_raises_error(self, tmp_path):
+        """Test request exception raises DownloadError."""
+        import requests
+
+        job = TaxiIngestionJob("yellow", 2024, 1)
+        destination = tmp_path / "test_file.parquet"
+
+        with patch.object(
+            requests,
+            "get",
+            side_effect=requests.exceptions.RequestException("Connection error"),
+        ):
+            with pytest.raises(DownloadError, match="Download failed"):
+                job._download_file("http://example.com/file.parquet", destination)
+
+
+class TestTaxiIngestionJobTransform:
+    """Tests for TaxiIngestionJob.transform method."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def teardown_method(self):
+        """Reset JobConfig singleton after each test."""
+        JobConfig.reset()
+
+    @patch("pyspark.sql.functions.sha2")
+    @patch("pyspark.sql.functions.concat_ws")
+    @patch("pyspark.sql.functions.coalesce")
+    @patch("pyspark.sql.functions.col")
+    @patch("pyspark.sql.functions.lit")
+    @patch("pyspark.sql.functions.current_timestamp")
+    @patch("pyspark.sql.functions.current_date")
+    def test_transform_calls_count(
+        self, mock_date, mock_ts, mock_lit, mock_col, mock_coalesce, mock_concat, mock_sha2
+    ):
+        """Test transform calls count on DataFrame."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+
+        # Create mock DataFrame with proper return values
+        mock_df = MagicMock()
+        mock_df.columns = ["col1", "col2"]
+        mock_df.count.return_value = 100
+        mock_df.schema = "test_schema"
+
+        # Chain mock for withColumn calls - each returns a new mock
+        mock_result = MagicMock()
+        mock_df.withColumn.return_value = mock_result
+        mock_result.withColumn.return_value = mock_result
+        mock_result.select.return_value.distinct.return_value.count.return_value = 100
+
+        job.transform(mock_df)
+
+        # Verify count was called
+        mock_df.count.assert_called_once()
+
+    @patch("pyspark.sql.functions.sha2")
+    @patch("pyspark.sql.functions.concat_ws")
+    @patch("pyspark.sql.functions.coalesce")
+    @patch("pyspark.sql.functions.col")
+    @patch("pyspark.sql.functions.lit")
+    @patch("pyspark.sql.functions.current_timestamp")
+    @patch("pyspark.sql.functions.current_date")
+    def test_transform_logs_record_count(
+        self, mock_date, mock_ts, mock_lit, mock_col, mock_coalesce, mock_concat, mock_sha2
+    ):
+        """Test transform logs record count."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+
+        mock_df = MagicMock()
+        mock_df.columns = ["col1"]
+        mock_df.count.return_value = 500
+        mock_df.schema = "schema"
+
+        mock_result = MagicMock()
+        mock_df.withColumn.return_value = mock_result
+        mock_result.withColumn.return_value = mock_result
+        mock_result.select.return_value.distinct.return_value.count.return_value = 500
+
+        with patch.object(job.logger, "info") as mock_log:
+            job.transform(mock_df)
+            # Check that record count was logged
+            calls = [str(call) for call in mock_log.call_args_list]
+            assert any("500" in call for call in calls)
+
+    @patch("pyspark.sql.functions.sha2")
+    @patch("pyspark.sql.functions.concat_ws")
+    @patch("pyspark.sql.functions.coalesce")
+    @patch("pyspark.sql.functions.col")
+    @patch("pyspark.sql.functions.lit")
+    @patch("pyspark.sql.functions.current_timestamp")
+    @patch("pyspark.sql.functions.current_date")
+    def test_transform_returns_dataframe(
+        self, mock_date, mock_ts, mock_lit, mock_col, mock_coalesce, mock_concat, mock_sha2
+    ):
+        """Test transform returns a DataFrame."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+
+        mock_df = MagicMock()
+        mock_df.columns = ["col1"]
+        mock_df.count.return_value = 10
+        mock_df.schema = "schema"
+
+        mock_result = MagicMock()
+        mock_df.withColumn.return_value = mock_result
+        mock_result.withColumn.return_value = mock_result
+        mock_result.select.return_value.distinct.return_value.count.return_value = 10
+
+        result = job.transform(mock_df)
+
+        assert result is not None
+
+
+class TestTaxiIngestionJobLoad:
+    """Tests for TaxiIngestionJob.load method."""
+
+    def setup_method(self):
+        """Reset JobConfig singleton before each test."""
+        JobConfig.reset()
+
+    def teardown_method(self):
+        """Reset JobConfig singleton after each test."""
+        JobConfig.reset()
+
+    def test_load_writes_to_gcs_path(self):
+        """Test load writes DataFrame to correct GCS path."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+
+        mock_df = MagicMock()
+        mock_cached_df = MagicMock()
+        mock_df.cache.return_value = mock_cached_df
+        mock_cached_df.count.return_value = 100
+
+        mock_writer = MagicMock()
+        mock_cached_df.write = mock_writer
+        mock_writer.mode.return_value = mock_writer
+        mock_writer.partitionBy.return_value = mock_writer
+        mock_writer.option.return_value = mock_writer
+
+        job.load(mock_df)
+
+        # Verify write chain was called with append mode
+        mock_writer.mode.assert_called_once_with("append")
+        mock_writer.partitionBy.assert_called_once()
+
+    def test_load_partitions_by_year_and_month(self):
+        """Test load partitions data by year and month."""
+        job = TaxiIngestionJob("yellow", 2024, 6)
+
+        mock_df = MagicMock()
+        mock_cached_df = MagicMock()
+        mock_df.cache.return_value = mock_cached_df
+        mock_cached_df.count.return_value = 100
+
+        mock_writer = MagicMock()
+        mock_cached_df.write = mock_writer
+        mock_writer.mode.return_value = mock_writer
+        mock_writer.partitionBy.return_value = mock_writer
+        mock_writer.option.return_value = mock_writer
+
+        job.load(mock_df)
+
+        mock_writer.partitionBy.assert_called_once_with("year", "month")
+
+    def test_load_caches_dataframe(self):
+        """Test load caches DataFrame before writing."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+
+        mock_df = MagicMock()
+        mock_cached_df = MagicMock()
+        mock_df.cache.return_value = mock_cached_df
+        mock_cached_df.count.return_value = 50
+
+        mock_writer = MagicMock()
+        mock_cached_df.write = mock_writer
+        mock_writer.mode.return_value = mock_writer
+        mock_writer.partitionBy.return_value = mock_writer
+        mock_writer.option.return_value = mock_writer
+
+        job.load(mock_df)
+
+        mock_df.cache.assert_called_once()
+
+    def test_load_unpersists_dataframe(self):
+        """Test load unpersists DataFrame after writing."""
+        job = TaxiIngestionJob("yellow", 2024, 1)
+
+        mock_df = MagicMock()
+        mock_cached_df = MagicMock()
+        mock_df.cache.return_value = mock_cached_df
+        mock_cached_df.count.return_value = 50
+
+        mock_writer = MagicMock()
+        mock_cached_df.write = mock_writer
+        mock_writer.mode.return_value = mock_writer
+        mock_writer.partitionBy.return_value = mock_writer
+        mock_writer.option.return_value = mock_writer
+
+        job.load(mock_df)
+
+        mock_cached_df.unpersist.assert_called_once()
