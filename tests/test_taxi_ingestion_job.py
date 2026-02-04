@@ -4,7 +4,6 @@ Unit tests for TaxiIngestionJob.
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 
 from etl.jobs.bronze.taxi_ingestion_job import (
     TaxiIngestionJob,
@@ -396,7 +395,14 @@ class TestTaxiIngestionJobTransform:
     @patch("pyspark.sql.functions.current_timestamp")
     @patch("pyspark.sql.functions.current_date")
     def test_transform_calls_count(
-        self, mock_date, mock_ts, mock_lit, mock_col, mock_coalesce, mock_concat, mock_sha2
+        self,
+        mock_date,
+        mock_ts,
+        mock_lit,
+        mock_col,
+        mock_coalesce,
+        mock_concat,
+        mock_sha2,
     ):
         """Test transform calls count on DataFrame."""
         job = TaxiIngestionJob("yellow", 2024, 1)
@@ -426,7 +432,14 @@ class TestTaxiIngestionJobTransform:
     @patch("pyspark.sql.functions.current_timestamp")
     @patch("pyspark.sql.functions.current_date")
     def test_transform_logs_record_count(
-        self, mock_date, mock_ts, mock_lit, mock_col, mock_coalesce, mock_concat, mock_sha2
+        self,
+        mock_date,
+        mock_ts,
+        mock_lit,
+        mock_col,
+        mock_coalesce,
+        mock_concat,
+        mock_sha2,
     ):
         """Test transform logs record count."""
         job = TaxiIngestionJob("yellow", 2024, 1)
@@ -455,7 +468,14 @@ class TestTaxiIngestionJobTransform:
     @patch("pyspark.sql.functions.current_timestamp")
     @patch("pyspark.sql.functions.current_date")
     def test_transform_returns_dataframe(
-        self, mock_date, mock_ts, mock_lit, mock_col, mock_coalesce, mock_concat, mock_sha2
+        self,
+        mock_date,
+        mock_ts,
+        mock_lit,
+        mock_col,
+        mock_coalesce,
+        mock_concat,
+        mock_sha2,
     ):
         """Test transform returns a DataFrame."""
         job = TaxiIngestionJob("yellow", 2024, 1)

@@ -3,7 +3,6 @@
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
-from datetime import datetime, timedelta
 
 # Add project root to sys.path so 'dags' module can be imported
 project_root = Path(__file__).resolve().parent.parent.parent
@@ -89,10 +88,9 @@ class MockDAGContext(MockDAG):
 
 class MockBashOperatorWithContext:
     def __init__(self, task_id, bash_command, dag=None):
-        global _current_dag
         self.task_id = task_id
         self.bash_command = bash_command
-        target_dag = dag or _current_dag
+        target_dag = dag or _current_dag  # noqa: F824
         if target_dag:
             target_dag._tasks.append(self)
 

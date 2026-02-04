@@ -289,18 +289,14 @@ class TestBaseSparkJobRun:
     def test_run_success_returns_true(self):
         """Test run() returns True on successful execution."""
         job = ConcreteTestJob("test_run_success")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             result = job.run()
             assert result is True
 
     def test_run_calls_all_etl_steps(self):
         """Test run() calls validate, extract, transform, load in order."""
         job = ConcreteTestJob("test_run_steps")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             job.run()
             assert job.validate_called is True
             assert job.extract_called is True
@@ -310,9 +306,7 @@ class TestBaseSparkJobRun:
     def test_run_sets_success_metrics(self):
         """Test run() sets SUCCESS status in metrics on success."""
         job = ConcreteTestJob("test_run_metrics")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             job.run()
             metrics = job.get_metrics()
             assert metrics["status"] == "SUCCESS"
@@ -322,9 +316,7 @@ class TestBaseSparkJobRun:
     def test_run_sets_start_time_in_metrics(self):
         """Test run() sets start_time in metrics."""
         job = ConcreteTestJob("test_start_time")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             job.run()
             metrics = job.get_metrics()
             assert "start_time" in metrics
@@ -346,9 +338,7 @@ class TestBaseSparkJobRun:
                 pass
 
         job = NoneExtractJob("test_none_extract")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             with pytest.raises(JobExecutionError, match="Extract step returned None"):
                 job.run()
 
@@ -369,9 +359,7 @@ class TestBaseSparkJobRun:
                 pass
 
         job = NoneTransformJob("test_none_transform")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             with pytest.raises(JobExecutionError, match="Transform step returned None"):
                 job.run()
 
@@ -392,9 +380,7 @@ class TestBaseSparkJobRun:
                 pass
 
         job = FailingJob("test_error_metrics")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             with pytest.raises(JobExecutionError):
                 job.run()
             metrics = job.get_metrics()
@@ -411,9 +397,7 @@ class TestBaseSparkJobRun:
             job.cleanup_called = True
 
         job.cleanup = mark_cleanup
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             job.run()
             assert job.cleanup_called is True
 
@@ -439,9 +423,7 @@ class TestBaseSparkJobRun:
                 self.cleanup_called = True
 
         job = FailingJob("test_cleanup_failure")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             with pytest.raises(JobExecutionError):
                 job.run()
             assert job.cleanup_called is True
@@ -463,9 +445,7 @@ class TestBaseSparkJobRun:
                 pass
 
         job = TypeErrorJob("test_wrap_error")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             with pytest.raises(JobExecutionError) as exc_info:
                 job.run()
             assert "Type error" in str(exc_info.value)
@@ -488,9 +468,7 @@ class TestBaseSparkJobRun:
                 pass
 
         job = JobErrorJob("test_reraise")
-        with patch.object(
-            SparkSessionManager, "get_session", return_value=MagicMock()
-        ):
+        with patch.object(SparkSessionManager, "get_session", return_value=MagicMock()):
             with pytest.raises(JobExecutionError, match="Direct job error"):
                 job.run()
 

@@ -152,7 +152,9 @@ class TestZoneLookupIngestionJobExtractFromSource:
         job.config._cache_dir = tmp_path
 
         mock_response = MagicMock()
-        mock_response.content = b"LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow"
+        mock_response.content = (
+            b"LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow"
+        )
 
         mock_df = MagicMock()
         mock_df.count.return_value = 1
@@ -175,7 +177,9 @@ class TestZoneLookupIngestionJobExtractFromSource:
 
         # Create cached file
         cache_file = tmp_path / job.file_name
-        cache_file.write_text("LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow")
+        cache_file.write_text(
+            "LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow"
+        )
 
         mock_df = MagicMock()
         mock_df.count.return_value = 1
@@ -196,15 +200,15 @@ class TestZoneLookupIngestionJobExtractFromSource:
         job.config._cache_dir = tmp_path
 
         with patch.object(
-            requests, "get", side_effect=requests.exceptions.RequestException("Network error")
+            requests,
+            "get",
+            side_effect=requests.exceptions.RequestException("Network error"),
         ):
             with pytest.raises(ReferenceDataError, match="Failed to download"):
                 job._extract_from_source()
 
     def test_extract_raises_on_parse_error(self, tmp_path):
         """Test extract raises ReferenceDataError on CSV parse failure."""
-        import requests
-
         job = ZoneLookupIngestionJob()
         job.spark = MagicMock()
         job.spark.read.option.return_value.csv.side_effect = Exception("Parse error")
@@ -276,7 +280,9 @@ class TestZoneLookupIngestionJobTransform:
         mock_df.columns = ["LocationID", "Borough", "Zone", "service_zone"]
         mock_df.filter.return_value.count.return_value = 0
         mock_df.count.return_value = 10
-        mock_df.select.return_value.distinct.return_value.count.return_value = 8  # 2 duplicates
+        mock_df.select.return_value.distinct.return_value.count.return_value = (
+            8  # 2 duplicates
+        )
 
         with patch.object(job.logger, "warning") as mock_warn:
             job.transform(mock_df)
@@ -302,7 +308,9 @@ class TestZoneLookupIngestionJobLoad:
 
         # Create the cached file that load() expects
         cache_file = tmp_path / job.file_name
-        cache_file.write_text("LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow")
+        cache_file.write_text(
+            "LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow"
+        )
 
         mock_df = MagicMock()
         mock_df.count.return_value = 100
@@ -325,7 +333,9 @@ class TestZoneLookupIngestionJobLoad:
 
         # Create the cached file that load() expects
         cache_file = tmp_path / job.file_name
-        cache_file.write_text("LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow")
+        cache_file.write_text(
+            "LocationID,Borough,Zone,service_zone\n1,Manhattan,Test,Yellow"
+        )
 
         mock_df = MagicMock()
         mock_df.count.return_value = 100

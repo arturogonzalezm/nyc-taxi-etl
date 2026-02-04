@@ -9,9 +9,7 @@ Tests cover uncovered functions:
 - main
 """
 
-import pytest
 from unittest.mock import patch, MagicMock
-from datetime import datetime
 
 from etl.jobs.bronze.taxi_injection_safe_backfill_job import (
     parse_month_spec,

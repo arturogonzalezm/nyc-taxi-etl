@@ -5,7 +5,6 @@ Sets up mock GCP environment variables to allow tests to run without
 actual GCP configuration.
 """
 
-import os
 import pytest
 
 
