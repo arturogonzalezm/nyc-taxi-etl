@@ -1,5 +1,5 @@
 [![Unit Tests](https://github.com/arturogonzalezm/nyc-taxi-etl/actions/workflows/ci.yml/badge.svg)](https://github.com/arturogonzalezm/nyc-taxi-etl/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/arturogonzalezm/nyc-taxi-etl/graph/badge.svg?token=4jNHztzVjc)](https://codecov.io/gh/arturogonzalezm/nyc-taxi-etl)
+[![codecov](https://codecov.io/gh/arturogonzalezm/nyc-taxi-etl/graph/badge.svg?token=dC4921tiws)](https://codecov.io/gh/arturogonzalezm/nyc-taxi-etl)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Linting: flake8](https://img.shields.io/badge/linting-flake8-yellowgreen.svg)](https://flake8.pycqa.org/)
 [![Linting: pylint](https://img.shields.io/badge/linting-pylint-blue.svg)](https://pylint.pycqa.org/)

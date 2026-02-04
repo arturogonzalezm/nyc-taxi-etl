@@ -14,6 +14,11 @@ class TestGCSConfig:
 
     def test_default_values_from_tfvars(self):
         """Test GCSConfig reads from terraform.tfvars when env vars not set."""
+        from pathlib import Path
+        tfvars_path = Path(__file__).resolve().parent.parent / "terraform" / "terraform.tfvars"
+        if not tfvars_path.exists():
+            pytest.skip("terraform.tfvars not available (gitignored, not present in CI)")
+        
         with patch.dict(os.environ, {}, clear=True):
             # Should fall back to terraform.tfvars
             config = GCSConfig()
