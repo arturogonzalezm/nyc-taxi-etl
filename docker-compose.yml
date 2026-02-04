@@ -63,6 +63,7 @@ services:
         condition: service_healthy
     volumes:
       - ./etl:/app/etl
+      - ./terraform:/app/terraform:ro
       - ./terraform/GCP_CREDENTIALS.json:/app/gcp-credentials.json:ro
   airflow-init:
     <<: *airflow-common

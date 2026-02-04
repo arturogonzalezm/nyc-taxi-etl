@@ -11,7 +11,7 @@ variable "project_id_base" {
 variable "project_name" {
   description = "GCP Project display name"
   type        = string
-  default     = "NYC Taxi ETL"
+  default     = "NYC Taxi Pipeline"
 }
 
 variable "billing_account_id" {
@@ -89,8 +89,7 @@ variable "github_repository" {
 # =============================================================================
 
 locals {
-  # Construct the full project ID: nyc-taxi-etl-dev-us-central1-001
-  full_project_id = "${var.project_id_base}-${var.environment}-${var.region}-${var.instance_number}"
-  # Bucket name: nyc-taxi-etl-dev-gcs-us-central1-001
+  # Construct the full project ID: nyc-taxi-etl-dev-001 (max 30 chars)
+  full_project_id = "${var.project_id_base}-${var.environment}-${var.instance_number}"
   full_bucket_id  = "${var.project_id_base}-${var.environment}-${var.resource_type}-${var.region}-${var.bucket_suffix}"
 }

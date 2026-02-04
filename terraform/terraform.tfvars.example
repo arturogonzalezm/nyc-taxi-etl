@@ -1,19 +1,20 @@
 # =============================================================================
-# NYC TAXI ETL - TERRAFORM VARIABLES
+# NYC TAXI PIPELINE - TERRAFORM VARIABLES
 # =============================================================================
 # Copy this file to terraform.tfvars and update the values.
 # The Python ETL jobs can parse this file to get GCP_PROJECT_ID and GCS_BUCKET.
 # =============================================================================
 
 # GCP Configuration
-project_id_base    = "nyc-taxi-etl"     # Base name for project ID
-environment        = "dev"                    # Environment: dev, staging, prod
-instance_number    = "001"                    # Instance number for uniqueness
-bucket_suffix      = "001"                    # Bucket suffix for uniqueness
-resource_type      = "gcs"                    # Resource type (gcs, bigquery, etc.)
-project_name       = "NYC Taxi ETL"      # Display name in GCP Console
-region             = "us-central1"            # GCP region
-zone               = "us-central1-a"          # GCP zone
+project_id_base    = "nyc-taxi-etl"
+environment        = "dev"
+instance_number    = "001"
+bucket_suffix      = "001"
+resource_type      = "gcs"
+project_name       = "NYC Taxi Pipeline"
+billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
+region             = "us-central1"
+zone               = "us-central1-a"
 
 # Billing Account (REQUIRED - get from: gcloud billing accounts list)
 billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
