@@ -76,7 +76,7 @@ def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
 
     required_vars = [
         'project_id_base', 'environment', 'region',
-        'instance_number', 'bucket_suffix', 'resource-type'
+        'instance_number', 'bucket_suffix', 'resource_type'
     ]
     missing = [v for v in required_vars if v not in tfvars]
     if missing:
@@ -90,11 +90,11 @@ def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
         f"{tfvars['instance_number']}"
     )
 
-    # Uses resource-type variable (typically 'gcs') from terraform.tfvars
+    # Uses resource_type variable (typically 'gcs') from terraform.tfvars
     bucket_name = (
         f"{tfvars['project_id_base']}-"
         f"{tfvars['environment']}-"
-        f"{tfvars['resource-type']}-"
+        f"{tfvars['resource_type']}-"
         f"{tfvars['region']}-"
         f"{tfvars['bucket_suffix']}"
     )

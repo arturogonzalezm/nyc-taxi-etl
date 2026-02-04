@@ -72,8 +72,10 @@ class TestCheckPartitionExists:
         mock_df.count.return_value = 1000
         mock_df.select.return_value.distinct.return_value.count.return_value = 950
         mock_spark.read.parquet.return_value = mock_df
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
 
-        exists, total, unique = check_partition_exists(mock_spark, "yellow", 2024, 1)
+        exists, total, unique = check_partition_exists(mock_spark, "yellow", 2024, 1, mock_config)
 
         assert exists is True
         assert total == 1000
@@ -83,8 +85,10 @@ class TestCheckPartitionExists:
         """Test partition does not exist."""
         mock_spark = MagicMock()
         mock_spark.read.parquet.side_effect = Exception("Path not found")
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
 
-        exists, total, unique = check_partition_exists(mock_spark, "yellow", 2024, 1)
+        exists, total, unique = check_partition_exists(mock_spark, "yellow", 2024, 1, mock_config)
 
         assert exists is False
         assert total == 0
@@ -107,8 +111,10 @@ class TestDeletePartition:
 
         mock_spark._jvm.org.apache.hadoop.fs.FileSystem.get.return_value = mock_fs
         mock_spark._jvm.org.apache.hadoop.fs.Path.return_value = MagicMock()
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
 
-        result = delete_partition(mock_spark, "yellow", 2024, 1)
+        result = delete_partition(mock_spark, "yellow", 2024, 1, mock_config)
 
         assert result is True
         mock_fs.delete.assert_called_once()
@@ -121,8 +127,10 @@ class TestDeletePartition:
 
         mock_spark._jvm.org.apache.hadoop.fs.FileSystem.get.return_value = mock_fs
         mock_spark._jvm.org.apache.hadoop.fs.Path.return_value = MagicMock()
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
 
-        result = delete_partition(mock_spark, "yellow", 2024, 1)
+        result = delete_partition(mock_spark, "yellow", 2024, 1, mock_config)
 
         assert result is False
 
@@ -132,8 +140,10 @@ class TestDeletePartition:
         mock_spark._jvm.org.apache.hadoop.fs.FileSystem.get.side_effect = Exception(
             "Error"
         )
+        mock_config = MagicMock()
+        mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
 
-        result = delete_partition(mock_spark, "yellow", 2024, 1)
+        result = delete_partition(mock_spark, "yellow", 2024, 1, mock_config)
 
         assert result is False
 

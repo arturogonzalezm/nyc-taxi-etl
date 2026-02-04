@@ -92,15 +92,14 @@ class TestPostgresLoadJobInit:
 
     def test_init_default_postgres_url(self):
         """Test default PostgreSQL URL when no env var set."""
-        with patch.dict(os.environ, {}, clear=True):
-            # Clear specific env vars
-            env_copy = os.environ.copy()
-            for key in ["POSTGRES_URL", "POSTGRES_USER", "POSTGRES_PASSWORD"]:
-                env_copy.pop(key, None)
-            with patch.dict(os.environ, env_copy, clear=True):
-                JobConfig.reset()
-                job = PostgresLoadJob("yellow")
-                assert "localhost:5432" in job.postgres_url
+        # Preserve GCP env vars needed for JobConfig, only remove Postgres-specific ones
+        env_copy = os.environ.copy()
+        for key in ["POSTGRES_URL", "POSTGRES_USER", "POSTGRES_PASSWORD"]:
+            env_copy.pop(key, None)
+        with patch.dict(os.environ, env_copy, clear=True):
+            JobConfig.reset()
+            job = PostgresLoadJob("yellow")
+            assert "localhost:5432" in job.postgres_url
 
     def test_job_name_format_with_all_params(self):
         """Test job name format includes taxi type, year, and month."""

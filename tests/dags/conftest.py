@@ -1,8 +1,14 @@
 """Conftest for DAG tests - mocks Airflow modules."""
 
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta
+
+# Add project root to sys.path so 'dags' module can be imported
+project_root = Path(__file__).resolve().parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 # Create mock Airflow modules before any DAG imports
 mock_dag = MagicMock()
