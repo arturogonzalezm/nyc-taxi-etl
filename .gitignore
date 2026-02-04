@@ -225,5 +225,5 @@ terraform/terraform.tfvars
 !terraform.tfvars.example
 # GCP Service Account Keys (sensitive)
 terraform/*.json
-terraform/nyc-taxi-pipeline-*.json
+terraform/nyc-taxi-etl-*.json
 *.DS_Store
