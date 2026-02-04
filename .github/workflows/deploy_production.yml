@@ -1,9 +1,7 @@
 name: Deploy Prod Environment into GCP
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
 
 env:
   TF_VERSION: '1.5.0'
