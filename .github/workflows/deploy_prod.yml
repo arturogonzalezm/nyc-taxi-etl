@@ -1,4 +1,4 @@
-name: Deploy Prod Environment
+name: Deploy Prod Environment into GCP
 
 on:
   push:

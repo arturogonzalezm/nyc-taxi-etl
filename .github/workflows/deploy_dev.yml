@@ -1,4 +1,4 @@
-name: Deploy Dev Environment
+name: Deploy Dev Environment in GCP and locally
 
 on:
   push:
