@@ -284,7 +284,7 @@ nyc-taxi-etl/
 │   │       └── spark_manager.py     # Spark session management
 │   └── __init__.py
 ├── terraform/                       # GCP infrastructure (Terraform)
-├── tests/                           # Unit tests (548+ tests, 68%+ coverage)
+├── tests/                           # Unit tests (374+ tests, 54%+ coverage)
 ├── sql/
 │   └── postgres/
 │       └── create_dimensional_model.sql  # PostgreSQL schema DDL
@@ -312,7 +312,7 @@ The PostgreSQL loader uses hash-based upserts to ensure idempotency:
 
 ## Testing
 
-The project includes comprehensive unit tests with 548+ tests and 68%+ code coverage.
+The project includes comprehensive unit tests with 374+ tests and 54%+ code coverage.
 
 ```bash
 # Run all tests

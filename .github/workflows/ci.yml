@@ -84,16 +84,15 @@ jobs:
         run: |
           mkdir -p data/bronze data/silver data/gold
 
-      - name: Run bronze bronze (test mode)
+      - name: Verify ETL module imports
         run: |
-          echo "Bronze ingestion test would run here"
-          # Commented out to avoid actual downloads in CI
-          # python etl/jobs/bronze_ingestion.py --months 2023-01 --mode local
-
-      - name: Run gold gold (test mode)
-        run: |
-          echo "Gold transformation test would run here"
-          # python etl/jobs/gold_transformation.py --months 2023-01 --mode local
+          python -c "from etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob; print('✓ Bronze ingestion module OK')"
+          python -c "from etl.jobs.gold.taxi_gold_job import TaxiGoldJob; print('✓ Gold transformation module OK')"
+          python -c "from etl.jobs.load.postgres_load_job import PostgresLoadJob; print('✓ Postgres load module OK')"
+          python -c "from etl.jobs.bronze.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Zone lookup module OK')"
+        env:
+          GCS_BUCKET: test-bucket
+          GCP_PROJECT_ID: test-project
 
   security-scan:
     name: Security Scan
