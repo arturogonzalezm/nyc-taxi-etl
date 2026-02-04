@@ -21,6 +21,7 @@ A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Comm
 ### Additional Documentation
 
 - [Architecture Details](docs/ARCHITECTURE.md)
+- [Authentication Guide](docs/AUTHENTICATION.md)
 - [Dataset Explanation](docs/DATASET.md)
 - [Data Model and Schema](docs/DATA_MODEL.md)
 - [Historical Strategy](docs/HISTORICAL_STRATEGY.md)
