@@ -123,57 +123,11 @@ resource "google_service_account_iam_member" "github_actions_impersonation" {
 }
 
 # =============================================================================
-# IAM ROLES FOR SERVICE ACCOUNT
+# IAM ROLES FOR SERVICE ACCOUNT (Bucket-Level Permissions)
 # =============================================================================
-
-# IAM: Storage Admin for GCS bucket management
-resource "google_project_iam_member" "storage_admin" {
-  project = data.google_project.nyc_taxi_project.project_id
-  role    = "roles/storage.admin"
-  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
-}
-
-# IAM: BigQuery Data Editor for data operations
-resource "google_project_iam_member" "bigquery_data_editor" {
-  project = data.google_project.nyc_taxi_project.project_id
-  role    = "roles/bigquery.dataEditor"
-  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
-}
-
-# IAM: BigQuery Job User for running queries
-resource "google_project_iam_member" "bigquery_job_user" {
-  project = data.google_project.nyc_taxi_project.project_id
-  role    = "roles/bigquery.jobUser"
-  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
-}
-
-# IAM: Service Usage Admin (to enable/disable APIs)
-resource "google_project_iam_member" "service_usage_admin" {
-  project = data.google_project.nyc_taxi_project.project_id
-  role    = "roles/serviceusage.serviceUsageAdmin"
-  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
-}
-
-# IAM: Service Account Admin (to manage service accounts)
-resource "google_project_iam_member" "service_account_admin" {
-  project = data.google_project.nyc_taxi_project.project_id
-  role    = "roles/iam.serviceAccountAdmin"
-  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
-}
-
-# IAM: Workload Identity Pool Admin (to manage workload identity)
-resource "google_project_iam_member" "workload_identity_pool_admin" {
-  project = data.google_project.nyc_taxi_project.project_id
-  role    = "roles/iam.workloadIdentityPoolAdmin"
-  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
-}
-
-# IAM: Editor (broad permissions for Terraform operations)
-resource "google_project_iam_member" "editor" {
-  project = data.google_project.nyc_taxi_project.project_id
-  role    = "roles/editor"
-  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
-}
+# Using granular bucket-level permissions instead of project-level IAM roles
+# to avoid requiring roles/resourcemanager.projectIamAdmin permission.
+# Project-level roles (editor, storage.admin, etc.) are granted during bootstrap.
 
 # =============================================================================
 # GOOGLE CLOUD STORAGE (GCS) BUCKETS
@@ -210,9 +164,28 @@ resource "google_storage_bucket" "nyc_taxi_etl" {
   depends_on = [google_project_service.storage]
 }
 
-# IAM binding for service account to access bucket
-resource "google_storage_bucket_iam_member" "pipeline_bucket_access" {
+# =============================================================================
+# BUCKET-LEVEL IAM BINDINGS
+# =============================================================================
+# Granular bucket-level permissions for the service account
+
+# Storage Object Admin - full control over objects in the bucket
+resource "google_storage_bucket_iam_member" "pipeline_bucket_object_admin" {
   bucket = google_storage_bucket.nyc_taxi_etl.name
   role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
+}
+
+# Storage Legacy Bucket Reader - allows listing bucket contents
+resource "google_storage_bucket_iam_member" "pipeline_bucket_reader" {
+  bucket = google_storage_bucket.nyc_taxi_etl.name
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
+}
+
+# Storage Legacy Bucket Writer - allows creating/deleting objects
+resource "google_storage_bucket_iam_member" "pipeline_bucket_writer" {
+  bucket = google_storage_bucket.nyc_taxi_etl.name
+  role   = "roles/storage.legacyBucketWriter"
   member = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
 }
