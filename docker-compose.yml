@@ -16,9 +16,10 @@ x-airflow-common: &airflow-common
     GCS_BUCKET: ${GCS_BUCKET}
     GCP_PROJECT_ID: ${GCP_PROJECT_ID}
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-credentials.json
+    CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /opt/airflow/gcp-credentials.json
   volumes:
     - ./dags:/opt/airflow/dags
-    - ./terraform/GCP_CREDENTIALS.json:/opt/airflow/gcp-credentials.json:ro
+    - ${HOME}/.config/gcloud/application_default_credentials.json:/opt/airflow/gcp-credentials.json:ro
     - ./test_dags:/opt/airflow/test_dags
     - ./etl:/opt/airflow/etl
     - airflow_logs:/opt/airflow/logs
@@ -64,7 +65,7 @@ services:
     volumes:
       - ./etl:/app/etl
       - ./terraform:/app/terraform:ro
-      - ./terraform/GCP_CREDENTIALS.json:/app/gcp-credentials.json:ro
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/app/gcp-credentials.json:ro
   airflow-init:
     <<: *airflow-common
     container_name: nyc-taxi-airflow-init
