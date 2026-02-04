@@ -123,7 +123,7 @@ resource "google_service_account_iam_member" "github_actions_impersonation" {
 }
 
 # =============================================================================
-# IAM ROLES
+# IAM ROLES FOR SERVICE ACCOUNT
 # =============================================================================
 
 # IAM: Storage Admin for GCS bucket management
@@ -144,6 +144,34 @@ resource "google_project_iam_member" "bigquery_data_editor" {
 resource "google_project_iam_member" "bigquery_job_user" {
   project = data.google_project.nyc_taxi_project.project_id
   role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
+}
+
+# IAM: Service Usage Admin (to enable/disable APIs)
+resource "google_project_iam_member" "service_usage_admin" {
+  project = data.google_project.nyc_taxi_project.project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
+}
+
+# IAM: Service Account Admin (to manage service accounts)
+resource "google_project_iam_member" "service_account_admin" {
+  project = data.google_project.nyc_taxi_project.project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
+}
+
+# IAM: Workload Identity Pool Admin (to manage workload identity)
+resource "google_project_iam_member" "workload_identity_pool_admin" {
+  project = data.google_project.nyc_taxi_project.project_id
+  role    = "roles/iam.workloadIdentityPoolAdmin"
+  member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
+}
+
+# IAM: Editor (broad permissions for Terraform operations)
+resource "google_project_iam_member" "editor" {
+  project = data.google_project.nyc_taxi_project.project_id
+  role    = "roles/editor"
   member  = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
 }
 
