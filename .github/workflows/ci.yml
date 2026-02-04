@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 run-name: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}
 
@@ -8,12 +8,16 @@ on:
   pull_request:
     branches: [main, develop, 'develop/*']
 
+env:
+  TF_VERSION: '1.5.0'
+  WORKING_DIR: './terraform'
+
 jobs:
   # =============================================================================
-  # STAGE 1: Code Quality (runs in parallel)
+  # STAGE 1: Linting and Code Format
   # =============================================================================
   lint-and-format:
-    name: 1.1 Linting and Code Format
+    name: 1. Linting and Code Format
     runs-on: ubuntu-latest
 
     steps:
@@ -36,9 +40,13 @@ jobs:
       - name: Lint with pylint
         run: pylint etl/ --disable=C0111,R0903,C0103 || true
 
+  # =============================================================================
+  # STAGE 2: Validate Terraform
+  # =============================================================================
   terraform-validate:
-    name: 1.2 Validate Terraform
+    name: 2. Validate Terraform
     runs-on: ubuntu-latest
+    needs: [lint-and-format]
 
     steps:
       - uses: actions/checkout@v4
@@ -46,23 +54,27 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: '1.5.0'
+          terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Format Check
-        working-directory: ./terraform
+        working-directory: ${{ env.WORKING_DIR }}
         run: terraform fmt -check -recursive
 
       - name: Terraform Init
-        working-directory: ./terraform
+        working-directory: ${{ env.WORKING_DIR }}
         run: terraform init -backend=false
 
       - name: Terraform Validate
-        working-directory: ./terraform
+        working-directory: ${{ env.WORKING_DIR }}
         run: terraform validate
 
+  # =============================================================================
+  # STAGE 3: Security Scan
+  # =============================================================================
   security-scan:
-    name: 1.3 Security Scan
+    name: 3. Security Scan
     runs-on: ubuntu-latest
+    needs: [terraform-validate]
     permissions:
       security-events: write
       contents: read
@@ -84,12 +96,12 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   # =============================================================================
-  # STAGE 2: Testing (requires Stage 1)
+  # STAGE 4: Unit Tests
   # =============================================================================
   unit-tests:
-    name: 2.1 Unit Tests
+    name: 4. Unit Tests
     runs-on: ubuntu-latest
-    needs: [lint-and-format]
+    needs: [security-scan]
 
     steps:
       - uses: actions/checkout@v4
@@ -111,10 +123,13 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  # =============================================================================
+  # STAGE 5: Integration Tests
+  # =============================================================================
   integration-tests:
-    name: 2.2 Integration Tests
+    name: 5. Integration Tests
     runs-on: ubuntu-latest
-    needs: [lint-and-format, unit-tests]
+    needs: [unit-tests]
 
     steps:
       - uses: actions/checkout@v4
@@ -139,3 +154,92 @@ jobs:
         env:
           GCS_BUCKET: test-bucket
           GCP_PROJECT_ID: test-project
+
+  # =============================================================================
+  # STAGE 6: Terraform Deploy (only on push, not PRs)
+  # =============================================================================
+  deploy-dev:
+    name: 6. Terraform Deploy (Dev)
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/develop/'))
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENVIRONMENT: 'dev'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          terraform plan \
+            -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+            -var="github_repository=${{ github.repository }}" \
+            -var="environment=${{ env.ENVIRONMENT }}" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform apply -auto-approve tfplan
+
+  deploy-prod:
+    name: 6. Terraform Deploy (Prod)
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENVIRONMENT: 'prod'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          terraform plan \
+            -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+            -var="github_repository=${{ github.repository }}" \
+            -var="environment=${{ env.ENVIRONMENT }}" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform apply -auto-approve tfplan
