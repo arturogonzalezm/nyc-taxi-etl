@@ -4,6 +4,42 @@ This directory contains Terraform configuration for provisioning Google Cloud Pl
 
 ---
 
+## Quick Start
+
+### For Organizations (Fully Automatic)
+
+If you have a GCP organization, everything can be deployed automatically via CI/CD:
+
+1. Create a service account with `roles/owner` at the organization level
+2. Set up Workload Identity Federation for GitHub Actions
+3. Add GitHub secrets and push - CI/CD handles the rest
+
+### For Individuals (No Organization)
+
+Run the bootstrap script once to set up the initial infrastructure:
+
+```bash
+cd terraform
+
+# Set required environment variables
+export BILLING_ACCOUNT_ID="XXXXXX-XXXXXX-XXXXXX"
+export GITHUB_REPOSITORY="owner/repo"
+
+# Run bootstrap (creates project, service account, state bucket, etc.)
+./bootstrap.sh dev   # For development environment
+./bootstrap.sh prod  # For production environment
+
+# The script outputs the GitHub secrets you need to add
+```
+
+After bootstrap:
+1. Add the secrets to GitHub (Settings > Secrets > Actions)
+2. Uncomment the backend configuration in `providers.tf`
+3. Run `terraform init -migrate-state` to move state to GCS
+4. Push to GitHub - CI/CD handles everything from now on!
+
+---
+
 ## Terraform Structure
 
 ### File Organization

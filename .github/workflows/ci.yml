@@ -168,6 +168,7 @@ jobs:
       id-token: write
     env:
       ENVIRONMENT: 'dev'
+      PROJECT_ID: 'nyc-taxi-etl-dev-001'
 
     steps:
       - name: Checkout repository
@@ -179,6 +180,9 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -187,6 +191,50 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform init
+
+      - name: Import existing resources (if not in state)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          # Import service account if exists but not in state
+          SA_EMAIL="nyc-taxi-etl-${{ env.ENVIRONMENT }}-sa-001@${{ env.PROJECT_ID }}.iam.gserviceaccount.com"
+          if gcloud iam service-accounts describe "$SA_EMAIL" --project="${{ env.PROJECT_ID }}" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_service_account.nyc_taxi_sa \
+              "projects/${{ env.PROJECT_ID }}/serviceAccounts/$SA_EMAIL" 2>/dev/null || true
+          fi
+
+          # Import workload identity pool if exists but not in state
+          if gcloud iam workload-identity-pools describe github-actions-pool \
+            --location=global --project="${{ env.PROJECT_ID }}" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_iam_workload_identity_pool.github_pool \
+              "projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-actions-pool" 2>/dev/null || true
+          fi
+
+          # Import workload identity provider if exists but not in state
+          if gcloud iam workload-identity-pools providers describe github-provider \
+            --workload-identity-pool=github-actions-pool \
+            --location=global --project="${{ env.PROJECT_ID }}" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_iam_workload_identity_pool_provider.github_provider \
+              "projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" 2>/dev/null || true
+          fi
+
+          # Import GCS bucket if exists but not in state
+          BUCKET_NAME="nyc-taxi-etl-${{ env.ENVIRONMENT }}-gcs-us-central1-001"
+          if gsutil ls -b "gs://$BUCKET_NAME" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_storage_bucket.nyc_taxi_etl \
+              "$BUCKET_NAME" 2>/dev/null || true
+          fi
 
       - name: Terraform Plan
         working-directory: ${{ env.WORKING_DIR }}
@@ -211,6 +259,7 @@ jobs:
       id-token: write
     env:
       ENVIRONMENT: 'prod'
+      PROJECT_ID: 'nyc-taxi-etl-prod-001'
 
     steps:
       - name: Checkout repository
@@ -222,6 +271,9 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -230,6 +282,50 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform init
+
+      - name: Import existing resources (if not in state)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          # Import service account if exists but not in state
+          SA_EMAIL="nyc-taxi-etl-${{ env.ENVIRONMENT }}-sa-001@${{ env.PROJECT_ID }}.iam.gserviceaccount.com"
+          if gcloud iam service-accounts describe "$SA_EMAIL" --project="${{ env.PROJECT_ID }}" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_service_account.nyc_taxi_sa \
+              "projects/${{ env.PROJECT_ID }}/serviceAccounts/$SA_EMAIL" 2>/dev/null || true
+          fi
+
+          # Import workload identity pool if exists but not in state
+          if gcloud iam workload-identity-pools describe github-actions-pool \
+            --location=global --project="${{ env.PROJECT_ID }}" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_iam_workload_identity_pool.github_pool \
+              "projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-actions-pool" 2>/dev/null || true
+          fi
+
+          # Import workload identity provider if exists but not in state
+          if gcloud iam workload-identity-pools providers describe github-provider \
+            --workload-identity-pool=github-actions-pool \
+            --location=global --project="${{ env.PROJECT_ID }}" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_iam_workload_identity_pool_provider.github_provider \
+              "projects/${{ env.PROJECT_ID }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" 2>/dev/null || true
+          fi
+
+          # Import GCS bucket if exists but not in state
+          BUCKET_NAME="nyc-taxi-etl-${{ env.ENVIRONMENT }}-gcs-us-central1-001"
+          if gsutil ls -b "gs://$BUCKET_NAME" &>/dev/null; then
+            terraform import -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_storage_bucket.nyc_taxi_etl \
+              "$BUCKET_NAME" 2>/dev/null || true
+          fi
 
       - name: Terraform Plan
         working-directory: ${{ env.WORKING_DIR }}

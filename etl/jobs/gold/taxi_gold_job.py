@@ -122,23 +122,23 @@ class TaxiGoldJob(BaseSparkJob):
     MIN_FARE_AMOUNT = 0  # Minimum fare (can be 0 for cancelled trips)
 
     def __init__(
-        self,
-        taxi_type: Literal["yellow", "green"],
-        year: int,
-        month: int,
-        end_year: Optional[int] = None,
-        end_month: Optional[int] = None,
-        config: Optional[JobConfig] = None,
+            self,
+            taxi_type: Literal["yellow", "green"],
+            year: int,
+            month: int,
+            end_year: Optional[int] = None,
+            end_month: Optional[int] = None,
+            config: Optional[JobConfig] = None,
     ):
         """
         Initialise the taxi gold layer job.
 
-        :params taxi_type: Type of taxi data (yellow or green)
-        :params year: Starting year of data (2009 or later)
-        :params month: Starting month of data (1-12)
-        :params end_year: Optional ending year for date range processing
-        :params end_month: Optional ending month for date range processing
-        :params config: Optional job configuration
+        :param taxi_type: Type of taxi data (yellow or green)
+        :param year: Starting year of data (2009 or later)
+        :param month: Starting month of data (1-12)
+        :param end_year: Optional ending year for date range processing
+        :param end_month: Optional ending month for date range processing
+        :param config: Optional job configuration
         :raises ValueError: If parameters are invalid
         """
         self._validate_parameters(taxi_type, year, month, end_year, end_month)
@@ -154,11 +154,11 @@ class TaxiGoldJob(BaseSparkJob):
 
     @staticmethod
     def _validate_parameters(
-        taxi_type: str,
-        year: int,
-        month: int,
-        end_year: Optional[int],
-        end_month: Optional[int],
+            taxi_type: str,
+            year: int,
+            month: int,
+            end_year: Optional[int],
+            end_month: Optional[int],
     ) -> None:
         """
         Validate job parameters.
@@ -264,14 +264,11 @@ class TaxiGoldJob(BaseSparkJob):
                     self.logger.warning(f"Partition {year}-{month} is empty, skipping")
                     continue
 
-                # Now get full count for logging
-                partition_count = df_partition.count()
-
                 dfs.append(df_partition)
                 all_columns.update(df_partition.columns)
                 self.logger.info(
                     f"✓ Loaded partition: year={year}, month={month} "
-                    f"({partition_count:,} records, {len(df_partition.columns)} columns)"
+                    f"({len(df_partition.columns)} columns)"
                 )
             except Exception as e:
                 self.logger.error(
@@ -338,9 +335,7 @@ class TaxiGoldJob(BaseSparkJob):
         # Note: year/month are partition columns in the directory path, not data columns
         # We already filtered by reading specific partition paths above, so no additional filter needed
 
-        self.logger.info("Union complete, materializing count...")
-        record_count = trips_df.count()
-        self.logger.info(f"Extracted {record_count:,} trip records from bronze layer")
+        self.logger.info("Union complete (lazy evaluation - count deferred)")
 
         return trips_df
 
@@ -358,8 +353,7 @@ class TaxiGoldJob(BaseSparkJob):
             zones_df = self.spark.read.csv(
                 zone_lookup_path, header=True, inferSchema=True
             )
-            zone_count = zones_df.count()
-            self.logger.info(f"Loaded {zone_count:,} zone records")
+            self.logger.info("Loaded zone lookup (count deferred)")
             return zones_df
         except Exception as e:
             raise JobExecutionError(f"Failed to read zone lookup: {e}") from e
@@ -368,7 +362,7 @@ class TaxiGoldJob(BaseSparkJob):
         """
         Transform bronze data into dimensional model.
 
-        :params data: Tuple of (trips_df, zones_df)
+        :param data: Tuple of (trips_df, zones_df)
         :returns: Dictionary with dimensional model tables:
                     {
                         'fact_trip': DataFrame,
@@ -381,15 +375,8 @@ class TaxiGoldJob(BaseSparkJob):
 
         self.logger.info("=== Starting Gold Layer Transformation ===")
 
-        # Remove duplicates from source data
-        initial_count = trips_df.count()
+        # Remove duplicates from source data (lazy - no count here)
         trips_df = self._remove_duplicates(trips_df)
-        deduped_count = trips_df.count()
-        if initial_count > deduped_count:
-            self.logger.warning(
-                f"Removed {initial_count - deduped_count:,} duplicate records "
-                f"({100 * (initial_count - deduped_count) / initial_count:.2f}%)"
-            )
 
         # Data quality filtering
         trips_clean = self._apply_data_quality_filters(trips_df)
@@ -433,10 +420,11 @@ class TaxiGoldJob(BaseSparkJob):
         - Bronze layer contains ALL records (audit trail)
         - Gold layer contains LATEST version only (business view)
 
+        Note: This method uses lazy evaluation - no counts are performed here.
+        Deduplication is applied when the DataFrame is materialized.
+
         :returns: DataFrame with duplicates removed, keeping latest version
         """
-        initial_count = df.count()
-
         if "record_hash" in df.columns:
             # Hash-based deduplication with SCD Type 1 logic
             self.logger.info(
@@ -458,16 +446,7 @@ class TaxiGoldJob(BaseSparkJob):
                     .drop("row_num")
                 )
 
-                deduped_count = df_deduped.count()
-                removed_count = initial_count - deduped_count
-
-                if removed_count > 0:
-                    self.logger.info(
-                        f"SCD Type 1: Removed {removed_count:,} older versions, "
-                        f"kept {deduped_count:,} latest records "
-                        f"({100 * removed_count / initial_count:.2f}% were duplicates)"
-                    )
-
+                self.logger.info("SCD Type 1 deduplication applied (lazy)")
                 return df_deduped
             else:
                 # Simple hash deduplication (no timestamp available)
@@ -493,10 +472,12 @@ class TaxiGoldJob(BaseSparkJob):
         - Invalid location IDs
         - Invalid timestamps
 
+        Note: This method uses lazy evaluation - no counts are performed here.
+        Filtering is applied when the DataFrame is materialized.
+
         :returns: Cleaned DataFrame with data quality flags
         """
-        self.logger.info("Applying data quality filters...")
-        initial_count = df.count()
+        self.logger.info("Applying data quality filters (lazy)...")
 
         # Identify pickup/dropoff datetime columns (different names for yellow/green)
         pickup_col = (
@@ -550,29 +531,18 @@ class TaxiGoldJob(BaseSparkJob):
         df_with_flags = df_with_flags.withColumn(
             "is_valid_record",
             ~(
-                F.col("has_null_timestamps")
-                | F.col("has_invalid_fare")
-                | F.col("has_invalid_distance")
-                | F.col("has_invalid_passenger_count")
-                | F.col("has_invalid_location")
-                | F.col("has_invalid_duration")
+                    F.col("has_null_timestamps")
+                    | F.col("has_invalid_fare")
+                    | F.col("has_invalid_distance")
+                    | F.col("has_invalid_passenger_count")
+                    | F.col("has_invalid_location")
+                    | F.col("has_invalid_duration")
             ),
         )
 
-        # Log quality metrics
-        total_invalid = df_with_flags.filter(~F.col("is_valid_record")).count()
-        self.logger.info("Data quality summary:")
-        self.logger.info(f"  Initial records: {initial_count:,}")
-        self.logger.info(
-            f"  Invalid records: {total_invalid:,} ({100 * total_invalid / initial_count:.2f}%)"
-        )
-
-        # Filter to valid records only
+        # Filter to valid records only (lazy - count deferred to load phase)
         df_clean = df_with_flags.filter(F.col("is_valid_record"))
-        clean_count = df_clean.count()
-        self.logger.info(
-            f"  Clean records: {clean_count:,} ({100 * clean_count / initial_count:.2f}%)"
-        )
+        self.logger.info("Data quality filters applied (lazy - counts deferred)")
 
         return df_clean
 
@@ -654,8 +624,7 @@ class TaxiGoldJob(BaseSparkJob):
             "data_layer",
         ).orderBy("date_key")
 
-        date_count = dim_date.count()
-        self.logger.info(f"Created dim_date: {date_count:,} unique dates")
+        self.logger.info("Created dim_date (count deferred)")
 
         return dim_date
 
@@ -692,8 +661,7 @@ class TaxiGoldJob(BaseSparkJob):
             "data_layer",
         ).orderBy("location_key")
 
-        location_count = dim_location.count()
-        self.logger.info(f"Created dim_location: {location_count:,} unique locations")
+        self.logger.info("Created dim_location (count deferred)")
 
         return dim_location
 
@@ -755,19 +723,16 @@ class TaxiGoldJob(BaseSparkJob):
             "data_layer",
         ).orderBy("payment_key")
 
-        payment_count = dim_payment.count()
-        self.logger.info(
-            f"Created dim_payment: {payment_count:,} unique payment combinations"
-        )
+        self.logger.info("Created dim_payment (count deferred)")
 
         return dim_payment
 
     def _create_fact_trip(
-        self,
-        trips_df: DataFrame,
-        dim_date: DataFrame,
-        dim_location: DataFrame,
-        dim_payment: DataFrame,
+            self,
+            trips_df: DataFrame,
+            dim_date: DataFrame,
+            dim_location: DataFrame,
+            dim_payment: DataFrame,
     ) -> DataFrame:
         """
         Create fact table with foreign keys to dimensions.
@@ -820,8 +785,8 @@ class TaxiGoldJob(BaseSparkJob):
                 F.when(
                     (F.col("trip_duration_seconds") > 0) & (F.col("trip_distance") > 0),
                     (
-                        F.col("trip_distance")
-                        / (F.col("trip_duration_seconds") / 3600.0)
+                            F.col("trip_distance")
+                            / (F.col("trip_duration_seconds") / 3600.0)
                     ),
                 ).otherwise(0),
             )
@@ -904,73 +869,45 @@ class TaxiGoldJob(BaseSparkJob):
             ),
         )
 
-        fact_count = fact_trip.count()
-        self.logger.info(f"Created fact_trip: {fact_count:,} trip records")
-
-        # Validate hash integrity
-        self._validate_hash_integrity(fact_trip)
+        self.logger.info("Created fact_trip (count deferred to load phase)")
 
         return fact_trip
 
-    def _validate_hash_integrity(self, fact_trip: DataFrame):
+    def _validate_hash_integrity(self, fact_trip: DataFrame, total_records: int):
         """
         Validate data integrity using fact_hash.
 
         Checks:
         1. fact_hash is not null
-        2. fact_hash is unique (no accidental duplicates)
-        3. Hash distribution is reasonable (no hash collisions)
+        2. Hash length is correct (SHA-256 = 64 hex characters)
 
-        :params fact_trip: Fact table DataFrame with fact_hash
+        Note: Hash uniqueness check is skipped for performance - duplicates
+        are already handled in the deduplication step.
+
+        :param fact_trip: Fact table DataFrame with fact_hash
+        :param total_records: Total record count (already computed during write)
         """
         self.logger.info("=== Validating Hash Integrity ===")
 
-        total_records = fact_trip.count()
-
-        # Check No null hashes
-        null_hashes = fact_trip.filter(F.col("fact_hash").isNull()).count()
+        # Check for null hashes using SQL expression (avoids F.col() for testability)
+        # This is necessary for data integrity
+        null_hashes = int(fact_trip.filter("fact_hash IS NULL").count())
         if null_hashes > 0:
             self.logger.error(f"Found {null_hashes:,} records with NULL fact_hash")
             raise JobExecutionError(
                 f"Data integrity error: {null_hashes} NULL hashes found"
             )
 
-        # Check Hash uniqueness
-        unique_hashes = fact_trip.select("fact_hash").distinct().count()
-        if unique_hashes != total_records:
-            duplicate_count = total_records - unique_hashes
-            self.logger.warning(
-                f"Hash uniqueness check: {unique_hashes:,} unique hashes for {total_records:,} records "
-                f"({duplicate_count:,} duplicates detected)"
-            )
-            # This is acceptable - duplicates should have been filtered in deduplication step
-        else:
-            self.logger.info(
-                f"✓ Hash uniqueness verified: All {total_records:,} hashes are unique"
-            )
-
-        # Check Hash length and format (SHA-256 = 64 hex characters)
-        invalid_hash_length = fact_trip.filter(
-            F.length(F.col("fact_hash")) != 64
-        ).count()
-        if invalid_hash_length > 0:
-            self.logger.error(
-                f"Found {invalid_hash_length:,} hashes with invalid length (expected 64)"
-            )
+        # Check hash length using a sample (much faster than full count)
+        # SHA-256 produces 64 hex characters - use SQL expression
+        sample_invalid = int(fact_trip.filter("LENGTH(fact_hash) != 64").limit(1).count())
+        if sample_invalid > 0:
+            self.logger.error("Found hashes with invalid length (expected 64)")
             raise JobExecutionError(
-                f"Data integrity error: {invalid_hash_length} invalid hash lengths"
+                "Data integrity error: invalid hash lengths found"
             )
 
-        self.logger.info("✓ All hash integrity checks passed")
-
-        # Log sample statistics
-        self.logger.info("Fact table statistics:")
-        fact_trip.select(
-            F.avg("trip_distance").alias("avg_distance"),
-            F.avg("fare_amount").alias("avg_fare"),
-            F.avg("trip_duration_minutes").alias("avg_duration_min"),
-            F.avg("tip_percentage").alias("avg_tip_pct"),
-        ).show()
+        self.logger.info(f"✓ Hash integrity validated for {total_records:,} records")
 
         return fact_trip
 
@@ -985,13 +922,14 @@ class TaxiGoldJob(BaseSparkJob):
         Strategy:
         - Fact table: Dynamic partition overwrite (only replaces partitions being written)
         - Dimensions: Full overwrite (small tables, always refreshed)
+        - Caching: Fact table is cached before write to avoid recomputation for validation
 
         This prevents:
         - Duplicate records in the same partition
         - Data corruption from partial writes
         - Stale dimension data
 
-        :params dimensional_model: Dictionary with fact and dimension DataFrames
+        :param dimensional_model: Dictionary with fact and dimension DataFrames
         """
 
         gold_base_path = self.config.get_storage_path("gold", taxi_type=self.taxi_type)
@@ -1001,7 +939,17 @@ class TaxiGoldJob(BaseSparkJob):
         fact_trip = dimensional_model["fact_trip"]
         fact_path = f"{gold_base_path}/fact_trip"
 
-        # Get partition info for logging
+        # Cache fact_trip to avoid recomputation during write and validation
+        # This is the main performance optimization - compute once, use twice
+        self.logger.info("Caching fact_trip for efficient write and validation...")
+        fact_trip = fact_trip.cache()
+
+        # Materialize the cache and get count in a single pass
+        self.logger.info("Materializing fact_trip (this may take a while for large datasets)...")
+        fact_count = int(fact_trip.count())
+        self.logger.info(f"Fact table materialized: {fact_count:,} records")
+
+        # Get partition info for logging (fast since data is cached)
         partitions = (
             fact_trip.select("partition_year", "partition_month").distinct().collect()
         )
@@ -1022,23 +970,34 @@ class TaxiGoldJob(BaseSparkJob):
         ).parquet(
             fact_path
         )
-
-        fact_count = fact_trip.count()
         self.logger.info(f"Wrote fact_trip: {fact_count:,} records")
+
+        # Validate hash integrity (uses cached data - no recomputation)
+        self._validate_hash_integrity(fact_trip, fact_count)
+
+        # Unpersist fact_trip cache to free memory
+        fact_trip.unpersist()
+        self.logger.info("Released fact_trip cache")
 
         # Write dimension tables (not partitioned - small lookup tables)
         # Full overwrite is appropriate for dimensions (SCD Type 1)
+        # Dimensions are small, so we count after write for logging
         for dim_name in ["dim_date", "dim_location", "dim_payment"]:
             dim_df = dimensional_model[dim_name]
             dim_path = f"{gold_base_path}/{dim_name}"
             self.logger.info(f"Writing {dim_name} to {dim_path}...")
 
+            # Cache small dimension tables for efficient write + count
+            dim_df = dim_df.cache()
+            dim_count = int(dim_df.count())
+
             dim_df.write.mode("overwrite").option("compression", "snappy").parquet(
                 dim_path
             )
-
-            dim_count = dim_df.count()
             self.logger.info(f"Wrote {dim_name}: {dim_count:,} records")
+
+            # Unpersist dimension cache
+            dim_df.unpersist()
 
         self.logger.info("=== Gold layer load complete ===")
         self.logger.info("Data integrity notes:")
@@ -1052,20 +1011,20 @@ class TaxiGoldJob(BaseSparkJob):
 
 
 def run_gold_job(
-    taxi_type: Literal["yellow", "green"],
-    year: int,
-    month: int,
-    end_year: Optional[int] = None,
-    end_month: Optional[int] = None,
+        taxi_type: Literal["yellow", "green"],
+        year: int,
+        month: int,
+        end_year: Optional[int] = None,
+        end_month: Optional[int] = None,
 ) -> bool:
     """
     Convenience function to run the gold layer job.
 
-    :params taxi_type: Type of taxi (yellow or green)
-    :params year: Starting year
-    :params month: Starting month (1-12)
-    :params end_year: Optional ending year for date range
-    :params end_month: Optional ending month for date range
+    :param taxi_type: Type of taxi (yellow or green)
+    :param year: Starting year
+    :param month: Starting month (1-12)
+    :param end_year: Optional ending year for date range
+    :param end_month: Optional ending month for date range
     :returns True if successful, False otherwise
     """
     job = TaxiGoldJob(taxi_type, year, month, end_year, end_month)
