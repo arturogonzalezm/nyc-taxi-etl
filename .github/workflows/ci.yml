@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI Pipeline
 
 run-name: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}
 
@@ -139,20 +139,3 @@ jobs:
         env:
           GCS_BUCKET: test-bucket
           GCP_PROJECT_ID: test-project
-
-  # =============================================================================
-  # STAGE 3: Deploy (requires all previous stages, only on push - not PRs)
-  # =============================================================================
-  deploy-development:
-    name: 3.1 Deploy to Development
-    needs: [lint-and-format, terraform-validate, security-scan, unit-tests, integration-tests]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/develop/'))
-    uses: ./.github/workflows/deploy_development.yml
-    secrets: inherit
-
-  deploy-production:
-    name: 3.2 Deploy to Production
-    needs: [lint-and-format, terraform-validate, security-scan, unit-tests, integration-tests]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/deploy_production.yml
-    secrets: inherit
