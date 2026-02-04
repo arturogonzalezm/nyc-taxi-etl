@@ -122,13 +122,13 @@ class TaxiGoldJob(BaseSparkJob):
     MIN_FARE_AMOUNT = 0  # Minimum fare (can be 0 for cancelled trips)
 
     def __init__(
-            self,
-            taxi_type: Literal["yellow", "green"],
-            year: int,
-            month: int,
-            end_year: Optional[int] = None,
-            end_month: Optional[int] = None,
-            config: Optional[JobConfig] = None,
+        self,
+        taxi_type: Literal["yellow", "green"],
+        year: int,
+        month: int,
+        end_year: Optional[int] = None,
+        end_month: Optional[int] = None,
+        config: Optional[JobConfig] = None,
     ):
         """
         Initialise the taxi gold layer job.
@@ -154,11 +154,11 @@ class TaxiGoldJob(BaseSparkJob):
 
     @staticmethod
     def _validate_parameters(
-            taxi_type: str,
-            year: int,
-            month: int,
-            end_year: Optional[int],
-            end_month: Optional[int],
+        taxi_type: str,
+        year: int,
+        month: int,
+        end_year: Optional[int],
+        end_month: Optional[int],
     ) -> None:
         """
         Validate job parameters.
@@ -531,12 +531,12 @@ class TaxiGoldJob(BaseSparkJob):
         df_with_flags = df_with_flags.withColumn(
             "is_valid_record",
             ~(
-                    F.col("has_null_timestamps")
-                    | F.col("has_invalid_fare")
-                    | F.col("has_invalid_distance")
-                    | F.col("has_invalid_passenger_count")
-                    | F.col("has_invalid_location")
-                    | F.col("has_invalid_duration")
+                F.col("has_null_timestamps")
+                | F.col("has_invalid_fare")
+                | F.col("has_invalid_distance")
+                | F.col("has_invalid_passenger_count")
+                | F.col("has_invalid_location")
+                | F.col("has_invalid_duration")
             ),
         )
 
@@ -728,11 +728,11 @@ class TaxiGoldJob(BaseSparkJob):
         return dim_payment
 
     def _create_fact_trip(
-            self,
-            trips_df: DataFrame,
-            dim_date: DataFrame,
-            dim_location: DataFrame,
-            dim_payment: DataFrame,
+        self,
+        trips_df: DataFrame,
+        dim_date: DataFrame,
+        dim_location: DataFrame,
+        dim_payment: DataFrame,
     ) -> DataFrame:
         """
         Create fact table with foreign keys to dimensions.
@@ -785,8 +785,8 @@ class TaxiGoldJob(BaseSparkJob):
                 F.when(
                     (F.col("trip_duration_seconds") > 0) & (F.col("trip_distance") > 0),
                     (
-                            F.col("trip_distance")
-                            / (F.col("trip_duration_seconds") / 3600.0)
+                        F.col("trip_distance")
+                        / (F.col("trip_duration_seconds") / 3600.0)
                     ),
                 ).otherwise(0),
             )
@@ -900,12 +900,12 @@ class TaxiGoldJob(BaseSparkJob):
 
         # Check hash length using a sample (much faster than full count)
         # SHA-256 produces 64 hex characters - use SQL expression
-        sample_invalid = int(fact_trip.filter("LENGTH(fact_hash) != 64").limit(1).count())
+        sample_invalid = int(
+            fact_trip.filter("LENGTH(fact_hash) != 64").limit(1).count()
+        )
         if sample_invalid > 0:
             self.logger.error("Found hashes with invalid length (expected 64)")
-            raise JobExecutionError(
-                "Data integrity error: invalid hash lengths found"
-            )
+            raise JobExecutionError("Data integrity error: invalid hash lengths found")
 
         self.logger.info(f"✓ Hash integrity validated for {total_records:,} records")
 
@@ -945,7 +945,9 @@ class TaxiGoldJob(BaseSparkJob):
         fact_trip = fact_trip.cache()
 
         # Materialize the cache and get count in a single pass
-        self.logger.info("Materializing fact_trip (this may take a while for large datasets)...")
+        self.logger.info(
+            "Materializing fact_trip (this may take a while for large datasets)..."
+        )
         fact_count = int(fact_trip.count())
         self.logger.info(f"Fact table materialized: {fact_count:,} records")
 
@@ -1011,11 +1013,11 @@ class TaxiGoldJob(BaseSparkJob):
 
 
 def run_gold_job(
-        taxi_type: Literal["yellow", "green"],
-        year: int,
-        month: int,
-        end_year: Optional[int] = None,
-        end_month: Optional[int] = None,
+    taxi_type: Literal["yellow", "green"],
+    year: int,
+    month: int,
+    end_year: Optional[int] = None,
+    end_month: Optional[int] = None,
 ) -> bool:
     """
     Convenience function to run the gold layer job.
