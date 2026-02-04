@@ -182,6 +182,28 @@ Authentication uses Workload Identity Federation (no JSON keys). Configure these
 | `GCP_SERVICE_ACCOUNT` | Email of the service account to impersonate (output `service_account_email`) |
 | `GCP_BILLING_ACCOUNT_ID` | Billing account identifier |
 
+#### Setting Up GitHub Secrets
+
+The GitHub secrets aren't set up yet. You need to add them to your repository.
+
+**Step 1:** Go to GitHub → Settings → Secrets and variables → Actions → New repository secret
+
+**Step 2:** Add these secrets:
+
+| Secret Name | How to get the value |
+|-------------|----------------------|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Run: `terraform output workload_identity_provider` |
+| `GCP_SERVICE_ACCOUNT` | Run: `terraform output service_account_email` |
+| `GCP_BILLING_ACCOUNT_ID` | Your GCP billing account ID |
+
+**Step 3:** Get the values locally:
+
+```bash
+cd terraform
+terraform output workload_identity_provider
+terraform output service_account_email
+```
+
 ### Manual Deployment
 
 ```bash
