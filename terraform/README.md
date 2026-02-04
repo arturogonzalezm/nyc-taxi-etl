@@ -60,7 +60,7 @@ The `main.tf` file is organized into logical sections:
 
 2. **Least Privilege Access**: Service accounts are granted only the minimum permissions required for pipeline operations.
 
-3. **Environment Isolation**: The naming convention supports multiple environments (dev, staging, prod) with isolated resources.
+3. **Environment Isolation**: The naming convention supports multiple environments (dev, prod) with isolated resources.
 
 4. **Secure CI/CD Integration**: Workload Identity Federation eliminates the need for long-lived service account keys in GitHub Actions.
 
@@ -137,7 +137,7 @@ The service account is granted the following roles:
 | `billing_account_id` | string | - | GCP Billing Account ID (required) |
 | `region` | string | `us-central1` | GCP Region |
 | `zone` | string | `us-central1-a` | GCP Zone |
-| `environment` | string | `dev` | Environment name (dev, staging, prod) |
+| `environment` | string | `dev` | Environment name (dev, prod) |
 | `instance_number` | string | `001` | Instance number for uniqueness |
 | `bucket_suffix` | string | `001` | Bucket suffix number for uniqueness |
 | `resource_type` | string | `gcs` | Resource discriminator used in bucket naming |

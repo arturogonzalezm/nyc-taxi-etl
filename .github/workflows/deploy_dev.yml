@@ -1,22 +1,20 @@
-name: Destroy Infrastructure in GCP
+name: Deploy Dev Environment
 
 on:
-  workflow_dispatch:
-    inputs:
-      confirm_destroy:
-        description: 'Type "destroy" to confirm infrastructure destruction'
-        required: true
-        type: string
+  push:
+    branches:
+      - develop
+      - 'develop/*'
 
 env:
   TF_VERSION: '1.5.0'
   WORKING_DIR: './terraform'
+  ENVIRONMENT: 'dev'
 
 jobs:
-  terraform-destroy:
-    name: Terraform Destroy
+  terraform:
+    name: Terraform Deploy (Dev)
     runs-on: ubuntu-latest
-    if: github.event.inputs.confirm_destroy == 'destroy'
     permissions:
       contents: read
       id-token: write
@@ -40,15 +38,15 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform init
 
-      - name: Terraform Destroy Plan
+      - name: Terraform Plan
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          terraform plan -destroy \
-            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+          terraform plan \
             -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
             -var="github_repository=${{ github.repository }}" \
-            -out=tfplan-destroy
+            -var="environment=${{ env.ENVIRONMENT }}" \
+            -out=tfplan
 
-      - name: Terraform Destroy
+      - name: Terraform Apply
         working-directory: ${{ env.WORKING_DIR }}
-        run: terraform apply -auto-approve tfplan-destroy
+        run: terraform apply -auto-approve tfplan
