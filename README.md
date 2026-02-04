@@ -26,7 +26,6 @@ A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Comm
 - [Data Model and Schema](docs/DATA_MODEL.md)
 - [Historical Strategy](docs/HISTORICAL_STRATEGY.md)
 - [Local Setup Guide](docs/LOCAL_SETUP.md)
-- [Terraform Infrastructure Setup](docs/TERRAFORM_INFRA.md)
 - [Terraform Reference](terraform/README.md)
 
 ## Architecture
