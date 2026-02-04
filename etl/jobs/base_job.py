@@ -149,9 +149,7 @@ class BaseSparkJob(ABC):
 
             # Initialise Spark session
             with self._track_metrics("initialisation"):
-                self.spark = SparkSessionManager.get_session(
-                    app_name=self.job_name
-                )
+                self.spark = SparkSessionManager.get_session(app_name=self.job_name)
 
             # Execute ETL pipeline
             with self._track_metrics("validation"):

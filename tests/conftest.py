@@ -13,7 +13,7 @@ import pytest
 def mock_gcp_env_vars(monkeypatch):
     """
     Automatically set mock GCP environment variables for all tests.
-    
+
     This allows tests to run without requiring actual GCP configuration
     (terraform.tfvars or environment variables).
     """

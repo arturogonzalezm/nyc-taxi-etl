@@ -62,7 +62,8 @@ class GCSConfig:
 
         if errors:
             raise ValueError(
-                "Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
+                "Configuration validation failed:\n"
+                + "\n".join(f"  - {e}" for e in errors)
             )
 
 

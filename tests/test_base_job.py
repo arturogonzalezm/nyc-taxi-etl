@@ -151,7 +151,9 @@ class TestBaseSparkJobSetupLogger:
         """Test logger handler is StreamHandler."""
         job = ConcreteTestJob("test_stream")
         # Find the StreamHandler we added
-        stream_handlers = [h for h in job.logger.handlers if isinstance(h, logging.StreamHandler)]
+        stream_handlers = [
+            h for h in job.logger.handlers if isinstance(h, logging.StreamHandler)
+        ]
         assert len(stream_handlers) >= 1
 
 
@@ -227,11 +229,14 @@ class TestBaseSparkJobAbstractMethods:
 
     def test_subclass_must_implement_extract(self):
         """Test subclass must implement extract method."""
+
         class IncompleteJob(BaseSparkJob):
             def validate_inputs(self):
                 pass
+
             def transform(self, df):
                 return df
+
             def load(self, df):
                 pass
 
@@ -240,11 +245,14 @@ class TestBaseSparkJobAbstractMethods:
 
     def test_subclass_must_implement_transform(self):
         """Test subclass must implement transform method."""
+
         class IncompleteJob(BaseSparkJob):
             def validate_inputs(self):
                 pass
+
             def extract(self):
                 return Mock()
+
             def load(self, df):
                 pass
 
@@ -253,11 +261,14 @@ class TestBaseSparkJobAbstractMethods:
 
     def test_subclass_must_implement_load(self):
         """Test subclass must implement load method."""
+
         class IncompleteJob(BaseSparkJob):
             def validate_inputs(self):
                 pass
+
             def extract(self):
                 return Mock()
+
             def transform(self, df):
                 return df
 

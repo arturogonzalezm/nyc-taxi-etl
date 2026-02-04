@@ -114,7 +114,11 @@ class SparkSessionManager:
                     .config("spark.hadoop.fs.gs.project.id", gcs_project)
                     .config(
                         "spark.hadoop.fs.gs.auth.type",
-                        "SERVICE_ACCOUNT_JSON_KEYFILE" if gcs_keyfile else "APPLICATION_DEFAULT",
+                        (
+                            "SERVICE_ACCOUNT_JSON_KEYFILE"
+                            if gcs_keyfile
+                            else "APPLICATION_DEFAULT"
+                        ),
                     )
                     .config(
                         "spark.hadoop.google.cloud.auth.service.account.json.keyfile",

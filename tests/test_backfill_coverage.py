@@ -75,7 +75,9 @@ class TestCheckPartitionExists:
         mock_config = MagicMock()
         mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
 
-        exists, total, unique = check_partition_exists(mock_spark, "yellow", 2024, 1, mock_config)
+        exists, total, unique = check_partition_exists(
+            mock_spark, "yellow", 2024, 1, mock_config
+        )
 
         assert exists is True
         assert total == 1000
@@ -88,7 +90,9 @@ class TestCheckPartitionExists:
         mock_config = MagicMock()
         mock_config.get_storage_path.return_value = "gs://test-bucket/bronze/yellow"
 
-        exists, total, unique = check_partition_exists(mock_spark, "yellow", 2024, 1, mock_config)
+        exists, total, unique = check_partition_exists(
+            mock_spark, "yellow", 2024, 1, mock_config
+        )
 
         assert exists is False
         assert total == 0

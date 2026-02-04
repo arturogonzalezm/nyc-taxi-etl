@@ -171,7 +171,7 @@ class TestTaxiIngestionJobValidateInputs:
     def test_validate_inputs_logs_info(self):
         """Test validate_inputs logs validation info."""
         job = TaxiIngestionJob("yellow", 2024, 1)
-        with patch.object(job.logger, 'info') as mock_log:
+        with patch.object(job.logger, "info") as mock_log:
             job.validate_inputs()
             mock_log.assert_called()
 
@@ -209,9 +209,11 @@ class TestTaxiIngestionJobExtract:
     def test_extract_builds_correct_url(self):
         """Test extract builds correct URL."""
         job = TaxiIngestionJob("yellow", 2024, 1)
-        expected_url = f"{TaxiIngestionJob.NYC_TLC_BASE_URL}/yellow_tripdata_2024-01.parquet"
-        
-        with patch.object(job, '_extract_with_local_cache') as mock_extract:
+        expected_url = (
+            f"{TaxiIngestionJob.NYC_TLC_BASE_URL}/yellow_tripdata_2024-01.parquet"
+        )
+
+        with patch.object(job, "_extract_with_local_cache") as mock_extract:
             mock_extract.return_value = Mock()
             job.extract()
             mock_extract.assert_called_once_with(expected_url)
@@ -230,13 +232,13 @@ class TestRunIngestionFunction:
 
     def test_run_ingestion_creates_job(self):
         """Test run_ingestion creates TaxiIngestionJob."""
-        with patch.object(TaxiIngestionJob, 'run', return_value=True) as mock_run:
+        with patch.object(TaxiIngestionJob, "run", return_value=True) as mock_run:
             result = run_ingestion("yellow", 2024, 1)
             mock_run.assert_called_once()
             assert result is True
 
     def test_run_ingestion_returns_false_on_failure(self):
         """Test run_ingestion returns False on job failure."""
-        with patch.object(TaxiIngestionJob, 'run', return_value=False):
+        with patch.object(TaxiIngestionJob, "run", return_value=False):
             result = run_ingestion("yellow", 2024, 1)
             assert result is False

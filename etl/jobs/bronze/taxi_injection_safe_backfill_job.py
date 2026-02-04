@@ -83,7 +83,9 @@ def check_partition_exists(
     Check if partition exists and return statistics.
     :returns (exists, total_records, unique_records)
     """
-    partition_path = config.get_storage_path("bronze", taxi_type) + f"/year={year}/month={month}"
+    partition_path = (
+        config.get_storage_path("bronze", taxi_type) + f"/year={year}/month={month}"
+    )
 
     try:
         df = spark.read.parquet(partition_path)
@@ -99,7 +101,9 @@ def delete_partition(spark, taxi_type: str, year: int, month: int, config) -> bo
     Delete a partition from GCS.
     :returns: True if deleted successfully
     """
-    partition_path = config.get_storage_path("bronze", taxi_type) + f"/year={year}/month={month}"
+    partition_path = (
+        config.get_storage_path("bronze", taxi_type) + f"/year={year}/month={month}"
+    )
 
     try:
         hadoop_conf = spark.sparkContext._jsc.hadoopConfiguration()

@@ -133,9 +133,7 @@ class ZoneLookupIngestionJob(BaseSparkJob):
                 self.logger.info(f"Downloaded {len(response.content):,} bytes")
 
             except requests.exceptions.RequestException as e:
-                raise ReferenceDataError(
-                    f"Failed to download zone lookup: {e}"
-                ) from e
+                raise ReferenceDataError(f"Failed to download zone lookup: {e}") from e
         else:
             self.logger.info(f"Using cached file: {local_file}")
 

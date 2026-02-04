@@ -14,11 +14,11 @@ from typing import Optional, Tuple
 def parse_tfvars(tfvars_path: Optional[str] = None) -> dict:
     """
     Parse terraform.tfvars file and return variables as a dictionary.
-    
+
     Args:
         tfvars_path: Path to terraform.tfvars file. If None, searches for it
                      relative to the project root.
-    
+
     Returns:
         Dictionary of variable names to values.
     """
@@ -30,27 +30,27 @@ def parse_tfvars(tfvars_path: Optional[str] = None) -> dict:
         tfvars_path = project_root / "terraform" / "terraform.tfvars"
     else:
         tfvars_path = Path(tfvars_path)
-    
+
     if not tfvars_path.exists():
         raise FileNotFoundError(f"terraform.tfvars not found at {tfvars_path}")
-    
+
     variables = {}
     # Pattern to match: variable_name = "value" or variable_name = value
     pattern = re.compile(r'^(\S+)\s*=\s*"?([^"#\n]+)"?\s*(?:#.*)?$')
-    
-    with open(tfvars_path, 'r') as f:
+
+    with open(tfvars_path, "r") as f:
         for line in f:
             line = line.strip()
             # Skip comments and empty lines
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
-            
+
             match = pattern.match(line)
             if match:
                 key = match.group(1).strip()
                 value = match.group(2).strip().strip('"')
                 variables[key] = value
-    
+
     return variables
 
 
@@ -75,8 +75,12 @@ def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
     tfvars = parse_tfvars(tfvars_path)
 
     required_vars = [
-        'project_id_base', 'environment', 'region',
-        'instance_number', 'bucket_suffix', 'resource_type'
+        "project_id_base",
+        "environment",
+        "region",
+        "instance_number",
+        "bucket_suffix",
+        "resource_type",
     ]
     missing = [v for v in required_vars if v not in tfvars]
     if missing:
@@ -107,24 +111,21 @@ def get_gcp_config_with_fallback() -> Tuple[str, str]:
     Get GCP config with fallback chain:
     1. Environment variables (GCP_PROJECT_ID, GCS_BUCKET)
     2. terraform.tfvars parsing
-    
+
     Returns:
         Tuple of (project_id, bucket_name)
     """
     project_id = os.getenv("GCP_PROJECT_ID", "")
     bucket_name = os.getenv("GCS_BUCKET", "")
-    
+
     # If both are set, use them
     if project_id and bucket_name:
         return project_id, bucket_name
-    
+
     # Try to parse from terraform.tfvars
     try:
         tf_project_id, tf_bucket_name = get_gcp_config()
-        return (
-            project_id or tf_project_id,
-            bucket_name or tf_bucket_name
-        )
+        return (project_id or tf_project_id, bucket_name or tf_bucket_name)
     except (FileNotFoundError, KeyError):
         # Return whatever we have (may be empty)
         return project_id, bucket_name

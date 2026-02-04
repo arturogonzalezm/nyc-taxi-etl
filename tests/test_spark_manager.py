@@ -85,9 +85,9 @@ class TestSparkSessionManagerStopSession:
         mock_session = MagicMock()
         SparkSessionManager._instance = mock_session
         SparkSessionManager._session_config = {"app_name": "test"}
-        
+
         SparkSessionManager.stop_session()
-        
+
         assert SparkSessionManager._instance is None
         assert SparkSessionManager._session_config == {}
 
@@ -95,9 +95,9 @@ class TestSparkSessionManagerStopSession:
         """Test stop_session calls stop on the session."""
         mock_session = MagicMock()
         SparkSessionManager._instance = mock_session
-        
+
         SparkSessionManager.stop_session()
-        
+
         mock_session.stop.assert_called_once()
 
     def test_stop_session_handles_stop_error(self):
@@ -105,10 +105,10 @@ class TestSparkSessionManagerStopSession:
         mock_session = MagicMock()
         mock_session.stop.side_effect = Exception("Stop failed")
         SparkSessionManager._instance = mock_session
-        
+
         # Should not raise
         SparkSessionManager.stop_session()
-        
+
         assert SparkSessionManager._instance is None
 
 
@@ -137,11 +137,11 @@ class TestSparkSessionManagerGetSessionInfo:
         SparkSessionManager._session_config = {
             "app_name": "TestApp",
             "gcs_project": "test-project",
-            "spark_version": "3.5.0"
+            "spark_version": "3.5.0",
         }
-        
+
         info = SparkSessionManager.get_session_info()
-        
+
         assert info["status"] == "active"
         assert info["app_name"] == "TestApp"
         assert info["gcs_project"] == "test-project"
@@ -174,6 +174,8 @@ class TestSparkSessionManagerEnvironmentConfig:
 
     def test_credentials_path_from_env(self):
         """Test credentials path from environment."""
-        with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/path/to/creds.json"}):
+        with patch.dict(
+            os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/path/to/creds.json"}
+        ):
             creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
             assert creds == "/path/to/creds.json"

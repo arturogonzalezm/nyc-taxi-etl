@@ -336,9 +336,7 @@ class TaxiIngestionJob(BaseSparkJob):
         df = df.cache()
         record_count = df.count()
 
-        storage_path = self.config.get_storage_path(
-            "bronze", taxi_type=self.taxi_type
-        )
+        storage_path = self.config.get_storage_path("bronze", taxi_type=self.taxi_type)
         self.logger.info(
             f"Writing {record_count:,} records to GCS bronze layer: {storage_path}"
         )
@@ -352,9 +350,7 @@ class TaxiIngestionJob(BaseSparkJob):
         self.logger.info(
             f"Successfully loaded {record_count:,} records to bronze layer"
         )
-        self.logger.info(
-            f"Path: {storage_path}/year={self.year}/month={self.month}/"
-        )
+        self.logger.info(f"Path: {storage_path}/year={self.year}/month={self.month}/")
 
         df.unpersist()
 
