@@ -261,41 +261,78 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         id: apply-dev
         continue-on-error: true
-        run: terraform apply -auto-approve tfplan
-
-      - name: Check Terraform Apply Result
         run: |
-          if [ "${{ steps.apply-dev.outcome }}" == "failure" ]; then
-            echo "::warning::Terraform apply encountered errors. Checking if resources already exist..."
-            # Verify critical resources exist - if they do, consider deployment successful
-            PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
-            
-            if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
-              echo "✓ Project exists: $PROJECT_ID"
-            else
-              echo "::error::Project does not exist and could not be created"
-              exit 1
-            fi
-            
-            SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
-            if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
-              echo "✓ Service account exists: $SA_EMAIL"
-            else
-              echo "::error::Service account does not exist and could not be created"
-              exit 1
-            fi
-            
-            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
-            if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
-              echo "✓ Data bucket exists: $BUCKET_DATA"
-            else
-              echo "::error::Data bucket does not exist and could not be created"
-              exit 1
-            fi
-            
-            echo "::notice::All critical infrastructure resources exist. Proceeding to next step."
+          # Capture terraform apply output for analysis
+          terraform apply -auto-approve tfplan 2>&1 | tee terraform_apply.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Verify Infrastructure State
+        id: verify-infra-dev
+        run: |
+          PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+          SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
+          
+          echo "============================================="
+          echo "Infrastructure Verification"
+          echo "============================================="
+          
+          INFRA_OK=true
+          
+          # Check Project
+          if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+            echo "✓ Project exists: $PROJECT_ID"
           else
-            echo "✓ Terraform apply completed successfully"
+            echo "✗ Project missing: $PROJECT_ID"
+            INFRA_OK=false
+          fi
+          
+          # Check Service Account
+          if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+            echo "✓ Service account exists: $SA_EMAIL"
+          else
+            echo "✗ Service account missing: $SA_EMAIL"
+            INFRA_OK=false
+          fi
+          
+          # Check Data Bucket
+          if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
+            echo "✓ Data bucket exists: $BUCKET_DATA"
+          else
+            echo "✗ Data bucket missing: $BUCKET_DATA"
+            INFRA_OK=false
+          fi
+          
+          # Check Terraform State Bucket
+          if gsutil ls -b "gs://${BUCKET_STATE}" &>/dev/null; then
+            echo "✓ State bucket exists: $BUCKET_STATE"
+          else
+            echo "✗ State bucket missing: $BUCKET_STATE"
+            INFRA_OK=false
+          fi
+          
+          # Check Workload Identity Pool
+          if gcloud iam workload-identity-pools describe github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
+            echo "✓ Workload Identity Pool exists: github-actions-pool"
+          else
+            echo "✗ Workload Identity Pool missing: github-actions-pool"
+            INFRA_OK=false
+          fi
+          
+          echo "============================================="
+          
+          # Determine outcome based on terraform apply result and infra state
+          if [ "${{ steps.apply-dev.outcome }}" == "success" ]; then
+            echo "::notice::Terraform apply succeeded - infrastructure created/updated successfully"
+            echo "status=applied" >> $GITHUB_OUTPUT
+          elif [ "$INFRA_OK" == "true" ]; then
+            echo "::notice::Terraform apply had errors but all infrastructure exists - proceeding to next step"
+            echo "status=exists" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Terraform apply failed and critical infrastructure is missing"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
   # =============================================================================
@@ -404,39 +441,76 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         id: apply-prod
         continue-on-error: true
-        run: terraform apply -auto-approve tfplan
-
-      - name: Check Terraform Apply Result
         run: |
-          if [ "${{ steps.apply-prod.outcome }}" == "failure" ]; then
-            echo "::warning::Terraform apply encountered errors. Checking if resources already exist..."
-            # Verify critical resources exist - if they do, consider deployment successful
-            PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
-            
-            if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
-              echo "✓ Project exists: $PROJECT_ID"
-            else
-              echo "::error::Project does not exist and could not be created"
-              exit 1
-            fi
-            
-            SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
-            if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
-              echo "✓ Service account exists: $SA_EMAIL"
-            else
-              echo "::error::Service account does not exist and could not be created"
-              exit 1
-            fi
-            
-            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
-            if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
-              echo "✓ Data bucket exists: $BUCKET_DATA"
-            else
-              echo "::error::Data bucket does not exist and could not be created"
-              exit 1
-            fi
-            
-            echo "::notice::All critical infrastructure resources exist. Proceeding to next step."
+          # Capture terraform apply output for analysis
+          terraform apply -auto-approve tfplan 2>&1 | tee terraform_apply.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Verify Infrastructure State
+        id: verify-infra-prod
+        run: |
+          PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+          SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
+          
+          echo "============================================="
+          echo "Infrastructure Verification"
+          echo "============================================="
+          
+          INFRA_OK=true
+          
+          # Check Project
+          if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+            echo "✓ Project exists: $PROJECT_ID"
           else
-            echo "✓ Terraform apply completed successfully"
+            echo "✗ Project missing: $PROJECT_ID"
+            INFRA_OK=false
+          fi
+          
+          # Check Service Account
+          if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+            echo "✓ Service account exists: $SA_EMAIL"
+          else
+            echo "✗ Service account missing: $SA_EMAIL"
+            INFRA_OK=false
+          fi
+          
+          # Check Data Bucket
+          if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
+            echo "✓ Data bucket exists: $BUCKET_DATA"
+          else
+            echo "✗ Data bucket missing: $BUCKET_DATA"
+            INFRA_OK=false
+          fi
+          
+          # Check Terraform State Bucket
+          if gsutil ls -b "gs://${BUCKET_STATE}" &>/dev/null; then
+            echo "✓ State bucket exists: $BUCKET_STATE"
+          else
+            echo "✗ State bucket missing: $BUCKET_STATE"
+            INFRA_OK=false
+          fi
+          
+          # Check Workload Identity Pool
+          if gcloud iam workload-identity-pools describe github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
+            echo "✓ Workload Identity Pool exists: github-actions-pool"
+          else
+            echo "✗ Workload Identity Pool missing: github-actions-pool"
+            INFRA_OK=false
+          fi
+          
+          echo "============================================="
+          
+          # Determine outcome based on terraform apply result and infra state
+          if [ "${{ steps.apply-prod.outcome }}" == "success" ]; then
+            echo "::notice::Terraform apply succeeded - infrastructure created/updated successfully"
+            echo "status=applied" >> $GITHUB_OUTPUT
+          elif [ "$INFRA_OK" == "true" ]; then
+            echo "::notice::Terraform apply had errors but all infrastructure exists - proceeding to next step"
+            echo "status=exists" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Terraform apply failed and critical infrastructure is missing"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
           fi
