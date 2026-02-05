@@ -3,9 +3,13 @@ DAG for Load Layer - PostgreSQL Load
 Handles: --taxi-type
 """
 
+import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+
+# Get container name from environment (set in docker-compose.yml)
+ETL_CONTAINER = os.getenv("PROJECT_ID_BASE", "nyc-taxi-etl") + "-etl"
 
 default_args = {
     "owner": "airflow",
@@ -31,5 +35,5 @@ with DAG(
 
     load_to_postgres = BashOperator(
         task_id="load_to_postgres",
-        bash_command="docker exec nyc-taxi-etl python -m etl.jobs.load.postgres_load_job --taxi-type {{ params.taxi_type }}",
+        bash_command=f"docker exec {ETL_CONTAINER} python -m etl.jobs.load.postgres_load_job --taxi-type {{{{ params.taxi_type }}}}",
     )

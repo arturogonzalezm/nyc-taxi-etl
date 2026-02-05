@@ -3,6 +3,7 @@ Configuration Management
 Centralized configuration for PySpark jobs using Singleton pattern.
 """
 
+import os
 import tempfile
 from dataclasses import dataclass, field
 from typing import Literal, Optional
@@ -103,7 +104,9 @@ class JobConfig:
         # - Automatically benefits from OS cleanup policies
         # - Works across different platforms (Linux, macOS, Windows)
         base_temp = Path(tempfile.gettempdir())
-        self._cache_dir = base_temp / "nyc-taxi-etl" / "cache"
+        # Get project name from terraform config or environment
+        project_name = os.getenv("PROJECT_ID_BASE", "nyc-taxi-etl")
+        self._cache_dir = base_temp / project_name / "cache"
 
         # Initialize GCS storage configuration
         self._gcs = GCSConfig()

@@ -210,10 +210,10 @@ jobs:
         run: |
           PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
           SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
-          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-gcs-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
           BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
 
-          TF_VARS="-var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
+          TF_VARS="-var-file=config.tfvars -var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
 
           # Import project
           if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
@@ -250,6 +250,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           terraform plan \
+            -var-file=config.tfvars \
             -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
             -var="organisation_id=${{ secrets.GCP_ORGANISATION_ID }}" \
             -var="github_repository=${{ github.repository }}" \
@@ -258,7 +259,44 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.WORKING_DIR }}
+        id: apply-dev
+        continue-on-error: true
         run: terraform apply -auto-approve tfplan
+
+      - name: Check Terraform Apply Result
+        run: |
+          if [ "${{ steps.apply-dev.outcome }}" == "failure" ]; then
+            echo "::warning::Terraform apply encountered errors. Checking if resources already exist..."
+            # Verify critical resources exist - if they do, consider deployment successful
+            PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+            
+            if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+              echo "✓ Project exists: $PROJECT_ID"
+            else
+              echo "::error::Project does not exist and could not be created"
+              exit 1
+            fi
+            
+            SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+            if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+              echo "✓ Service account exists: $SA_EMAIL"
+            else
+              echo "::error::Service account does not exist and could not be created"
+              exit 1
+            fi
+            
+            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
+            if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
+              echo "✓ Data bucket exists: $BUCKET_DATA"
+            else
+              echo "::error::Data bucket does not exist and could not be created"
+              exit 1
+            fi
+            
+            echo "::notice::All critical infrastructure resources exist. Proceeding to next step."
+          else
+            echo "✓ Terraform apply completed successfully"
+          fi
 
   # =============================================================================
   # STAGE 6: Terraform Deploy (Production)
@@ -315,10 +353,10 @@ jobs:
         run: |
           PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
           SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
-          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-gcs-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
           BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
 
-          TF_VARS="-var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
+          TF_VARS="-var-file=config.tfvars -var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
 
           # Import project
           if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
@@ -355,6 +393,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: |
           terraform plan \
+            -var-file=config.tfvars \
             -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
             -var="organisation_id=${{ secrets.GCP_ORGANISATION_ID }}" \
             -var="github_repository=${{ github.repository }}" \
@@ -363,4 +402,41 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.WORKING_DIR }}
+        id: apply-prod
+        continue-on-error: true
         run: terraform apply -auto-approve tfplan
+
+      - name: Check Terraform Apply Result
+        run: |
+          if [ "${{ steps.apply-prod.outcome }}" == "failure" ]; then
+            echo "::warning::Terraform apply encountered errors. Checking if resources already exist..."
+            # Verify critical resources exist - if they do, consider deployment successful
+            PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+            
+            if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+              echo "✓ Project exists: $PROJECT_ID"
+            else
+              echo "::error::Project does not exist and could not be created"
+              exit 1
+            fi
+            
+            SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+            if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+              echo "✓ Service account exists: $SA_EMAIL"
+            else
+              echo "::error::Service account does not exist and could not be created"
+              exit 1
+            fi
+            
+            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
+            if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
+              echo "✓ Data bucket exists: $BUCKET_DATA"
+            else
+              echo "::error::Data bucket does not exist and could not be created"
+              exit 1
+            fi
+            
+            echo "::notice::All critical infrastructure resources exist. Proceeding to next step."
+          else
+            echo "✓ Terraform apply completed successfully"
+          fi

@@ -30,7 +30,7 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: nyc-taxi-postgres
+    container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-postgres
     ports:
       - "5432:5432"
     environment:
@@ -49,7 +49,7 @@ services:
     build:
       context: .
       dockerfile: etl/Dockerfile
-    container_name: nyc-taxi-etl
+    container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-etl
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -68,7 +68,7 @@ services:
       - ${HOME}/.config/gcloud/application_default_credentials.json:/app/gcp-credentials.json:ro
   airflow-init:
     <<: *airflow-common
-    container_name: nyc-taxi-airflow-init
+    container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-airflow-init
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/nyc_taxi
@@ -88,7 +88,7 @@ services:
     restart: "no"
   airflow-webserver:
     <<: *airflow-common
-    container_name: nyc-taxi-airflow-webserver
+    container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-airflow-webserver
     command: webserver
     ports:
       - "8080:8080"
@@ -103,7 +103,7 @@ services:
         condition: service_completed_successfully
   airflow-scheduler:
     <<: *airflow-common
-    container_name: nyc-taxi-airflow-scheduler
+    container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-airflow-scheduler
     command: scheduler
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"]

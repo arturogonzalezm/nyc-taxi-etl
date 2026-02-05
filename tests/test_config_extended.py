@@ -7,6 +7,7 @@ import pytest
 from unittest.mock import patch
 
 from etl.jobs.utils.config import GCSConfig, JobConfig
+from etl.jobs.utils.terraform_config import get_gcp_config
 
 
 class TestGCSConfig:
@@ -24,11 +25,14 @@ class TestGCSConfig:
                 "terraform.tfvars not available (gitignored, not present in CI)"
             )
 
+        # Get expected values from terraform.tfvars (single source of truth)
+        expected_project_id, expected_bucket = get_gcp_config(str(tfvars_path))
+
         with patch.dict(os.environ, {}, clear=True):
             # Should fall back to terraform.tfvars
             config = GCSConfig()
-            assert config.bucket == "nyc-taxi-etl-dev-gcs-us-central1-003"
-            assert config.project_id == "nyc-taxi-etl-dev-003"
+            assert config.bucket == expected_bucket
+            assert config.project_id == expected_project_id
 
     def test_custom_values_from_env(self):
         """Test GCSConfig reads from environment variables."""

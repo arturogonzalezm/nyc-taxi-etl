@@ -3,9 +3,13 @@ DAG for Gold Layer - Taxi Data Transformation
 Handles: --taxi-type, --year (start), --month (start), --end-year, --end-month
 """
 
+import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+
+# Get container name from environment (set in docker-compose.yml)
+ETL_CONTAINER = os.getenv("PROJECT_ID_BASE", "nyc-taxi-etl") + "-etl"
 
 default_args = {
     "owner": "airflow",
@@ -36,7 +40,7 @@ with DAG(
     transform_to_gold = BashOperator(
         task_id="transform_to_gold",
         bash_command=(
-            "docker exec nyc-taxi-etl python -m etl.jobs.gold.taxi_gold_job "
+            f"docker exec {ETL_CONTAINER} python -m etl.jobs.gold.taxi_gold_job "
             "--taxi-type {{ params.taxi_type }} "
             "--year {{ params.start_year }} "
             "--month {{ params.start_month }} "

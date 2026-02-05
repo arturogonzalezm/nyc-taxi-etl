@@ -3,9 +3,13 @@ DAG for Bronze Layer - Taxi Trip Data Ingestion
 Handles: --taxi-type, --start-year, --start-month, --end-year, --end-month
 """
 
+import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+
+# Get container name from environment (set in docker-compose.yml)
+ETL_CONTAINER = os.getenv("PROJECT_ID_BASE", "nyc-taxi-etl") + "-etl"
 
 default_args = {
     "owner": "airflow",
@@ -36,7 +40,7 @@ with DAG(
     ingest_taxi_data = BashOperator(
         task_id="ingest_taxi_data",
         bash_command=(
-            "docker exec nyc-taxi-etl python -m etl.jobs.bronze.taxi_ingestion_job "
+            f"docker exec {ETL_CONTAINER} python -m etl.jobs.bronze.taxi_ingestion_job "
             "--taxi-type {{ params.taxi_type }} "
             "--start-year {{ params.start_year }} "
             "--start-month {{ params.start_month }} "

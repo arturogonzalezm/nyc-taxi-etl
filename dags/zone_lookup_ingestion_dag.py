@@ -3,9 +3,13 @@ DAG for Bronze Layer - Zone Lookup Ingestion
 No date range parameters required.
 """
 
+import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+
+# Get container name from environment (set in docker-compose.yml)
+ETL_CONTAINER = os.getenv("PROJECT_ID_BASE", "nyc-taxi-etl") + "-etl"
 
 default_args = {
     "owner": "airflow",
@@ -28,5 +32,5 @@ with DAG(
 
     ingest_zone_lookup = BashOperator(
         task_id="ingest_zone_lookup",
-        bash_command="docker exec nyc-taxi-etl python -m etl.jobs.bronze.zone_lookup_ingestion_job",
+        bash_command=f"docker exec {ETL_CONTAINER} python -m etl.jobs.bronze.zone_lookup_ingestion_job",
     )

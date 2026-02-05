@@ -22,3 +22,6 @@ resource_type = "gcs"
 # GCP Region
 region = "us-central1"
 zone   = "us-central1-a"
+
+# Environment (dev or prod) - overridden by CI/CD workflow
+environment = "dev"
