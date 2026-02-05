@@ -13,8 +13,8 @@ project_id_base = "nyc-taxi-etl"
 project_name    = "NYC Taxi Pipeline"
 
 # Instance numbering
-instance_number = "002"
-bucket_suffix   = "002"
+instance_number = "001"
+bucket_suffix   = "001"
 
 # Resource type for bucket naming
 resource_type = "gcs"

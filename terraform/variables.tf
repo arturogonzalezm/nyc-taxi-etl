@@ -60,13 +60,13 @@ variable "environment" {
 variable "instance_number" {
   description = "Instance number for resource naming (e.g., 001, 002)"
   type        = string
-  default     = "002"
+  default     = "001"
 }
 
 variable "bucket_suffix" {
   description = "Bucket suffix number (e.g., 001, 002)"
   type        = string
-  default     = "002"
+  default     = "001"
 }
 
 variable "resource_type" {
