@@ -91,13 +91,23 @@ resource "google_project_service" "sts" {
 }
 
 # =============================================================================
-# SERVICE ACCOUNT
+# SERVICE ACCOUNTS
 # =============================================================================
 
-# Service Account for the pipeline
+# Service Account for the pipeline (CI/CD and infrastructure management)
 resource "google_service_account" "nyc_taxi_sa" {
   account_id   = "${var.project_id_base}-${var.environment}-sa-${var.instance_number}"
   display_name = "NYC Taxi Pipeline Service Account (${var.environment})"
+  project      = google_project.nyc_taxi_project.project_id
+
+  depends_on = [google_project_service.iam]
+}
+
+# Service Account for Airflow (local docker-compose) - GCS read/write only
+resource "google_service_account" "airflow_sa" {
+  account_id   = "${var.project_id_base}-${var.environment}-airflow-${var.instance_number}"
+  display_name = "Airflow Service Account - GCS Read/Write Only (${var.environment})"
+  description  = "Service account for Apache Airflow running locally via docker-compose. Limited to GCS bucket read/write operations only."
   project      = google_project.nyc_taxi_project.project_id
 
   depends_on = [google_project_service.iam]
@@ -296,4 +306,27 @@ resource "google_storage_bucket_iam_member" "tfstate_bucket_admin" {
   bucket = google_storage_bucket.terraform_state.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.nyc_taxi_sa.email}"
+}
+
+# =============================================================================
+# AIRFLOW SERVICE ACCOUNT - GCS BUCKET IAM BINDINGS
+# =============================================================================
+# Airflow (local docker-compose) is granted ONLY read/write access to the GCS bucket.
+# This follows the principle of least privilege - Airflow only needs to:
+# - Read data from Bronze/Gold layers
+# - Write data to Bronze/Gold layers
+# No other GCP permissions are granted.
+
+# Storage Object Admin - read/write/delete objects in the data bucket
+resource "google_storage_bucket_iam_member" "airflow_bucket_object_admin" {
+  bucket = google_storage_bucket.nyc_taxi_etl.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.airflow_sa.email}"
+}
+
+# Storage Legacy Bucket Reader - allows listing bucket contents
+resource "google_storage_bucket_iam_member" "airflow_bucket_reader" {
+  bucket = google_storage_bucket.nyc_taxi_etl.name
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:${google_service_account.airflow_sa.email}"
 }

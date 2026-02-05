@@ -9,8 +9,13 @@ output "project_number" {
 }
 
 output "service_account_email" {
-  description = "Email of the NYC Taxi service account"
+  description = "Email of the NYC Taxi pipeline service account (CI/CD)"
   value       = google_service_account.nyc_taxi_sa.email
+}
+
+output "airflow_service_account_email" {
+  description = "Email of the Airflow service account (GCS read/write only)"
+  value       = google_service_account.airflow_sa.email
 }
 
 output "gcs_bucket_name" {
@@ -29,7 +34,7 @@ output "terraform_state_bucket" {
 }
 
 output "iam_roles_assigned" {
-  description = "IAM roles assigned to the service account"
+  description = "IAM roles assigned to the pipeline service account (CI/CD)"
   value = [
     "roles/editor",
     "roles/storage.admin",
@@ -37,6 +42,14 @@ output "iam_roles_assigned" {
     "roles/iam.serviceAccountAdmin",
     "roles/iam.workloadIdentityPoolAdmin",
     "roles/resourcemanager.projectIamAdmin"
+  ]
+}
+
+output "airflow_iam_roles_assigned" {
+  description = "IAM roles assigned to the Airflow service account (GCS only)"
+  value = [
+    "roles/storage.objectAdmin (bucket-level)",
+    "roles/storage.legacyBucketReader (bucket-level)"
   ]
 }
 

@@ -149,18 +149,33 @@ Terraform state is currently stored locally. For production environments, consid
 | Resource Type | Name/Identifier | Description |
 |---------------|-----------------|-------------|
 | GCP Project | `${project_id_base}-${environment}-${region}-${instance_number}` | Primary project for all resources |
-| Service Account | `${project_id_base}-${environment}-sa-${instance_number}@<project_id>.iam.gserviceaccount.com` | Service account for pipeline operations |
+| Service Account (Pipeline) | `${project_id_base}-${environment}-sa-${instance_number}@<project_id>.iam.gserviceaccount.com` | Service account for CI/CD and infrastructure management |
+| Service Account (Airflow) | `${project_id_base}-${environment}-airflow-${instance_number}@<project_id>.iam.gserviceaccount.com` | Service account for Airflow (GCS read/write only) |
 | GCS Bucket | `${project_id_base}-${environment}-gcs-${region}-${instance_number}` | Data lake storage bucket |
 | Workload Identity Pool | `github-actions-pool` | Identity pool for GitHub Actions |
 | Workload Identity Provider | `github-provider` | OIDC provider for GitHub authentication |
 
 ### IAM Roles Assigned
 
-The service account is granted the following roles:
+#### Pipeline Service Account (CI/CD)
 
+The pipeline service account is granted the following project-level roles:
+
+- `roles/editor` - General project editing permissions
 - `roles/storage.admin` - Full control of GCS resources
-- `roles/bigquery.dataEditor` - Read/write access to BigQuery datasets
-- `roles/bigquery.jobUser` - Permission to run BigQuery jobs
+- `roles/serviceusage.serviceUsageAdmin` - Manage API enablement
+- `roles/iam.serviceAccountAdmin` - Manage service accounts
+- `roles/iam.workloadIdentityPoolAdmin` - Manage WIF pools and providers
+- `roles/resourcemanager.projectIamAdmin` - Manage project IAM policies
+
+#### Airflow Service Account (Local Docker-Compose)
+
+The Airflow service account follows the **principle of least privilege** and is granted **only** bucket-level permissions:
+
+- `roles/storage.objectAdmin` - Read/write/delete objects in the GCS bucket
+- `roles/storage.legacyBucketReader` - List bucket contents
+
+This service account is designed for Apache Airflow running locally via docker-compose. It can **only** read and write to the GCS bucket - no other GCP permissions are granted.
 
 ---
 
@@ -187,11 +202,13 @@ The service account is granted the following roles:
 |--------|-------------|
 | `project_id` | The GCP project ID |
 | `project_number` | The GCP project number |
-| `service_account_email` | Email of the NYC Taxi service account |
+| `service_account_email` | Email of the pipeline service account (CI/CD) |
+| `airflow_service_account_email` | Email of the Airflow service account (GCS read/write only) |
 | `gcs_bucket_name` | Name of the GCS bucket |
 | `gcs_bucket_url` | URL of the GCS bucket |
 | `workload_identity_provider` | Workload Identity Provider resource name |
 | `workload_identity_pool` | Workload Identity Pool resource name |
+| `airflow_iam_roles_assigned` | IAM roles assigned to the Airflow service account |
 
 ---
 
