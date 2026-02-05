@@ -52,9 +52,9 @@ Service URLs:
 
 | Service | Container Name | Ports | Purpose |
 |---------|---------------|-------|---------|
-| PostgreSQL | nyc-taxi-postgres | 5432 | Data warehouse |
-| ETL | nyc-taxi-etl | - | PySpark processing |
-| Airflow Webserver | nyc-taxi-airflow-webserver | 8080 | Airflow UI |
+| PostgreSQL | nyc-taxi-etl-postgres | 5432 | Data warehouse |
+| ETL | nyc-taxi-etl-etl | - | PySpark processing |
+| Airflow Webserver | nyc-taxi-etl-airflow-webserver | 8080 | Airflow UI |
 
 ### Docker Compose Architecture
 
@@ -102,7 +102,7 @@ Service URLs:
 
 ```bash
 # Enter the ETL container
-docker exec -it nyc-taxi-etl bash
+docker exec -it nyc-taxi-etl-etl bash
 
 # Run ingestion job
 python -m etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --month 1
@@ -129,7 +129,7 @@ python -m etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --mo
 
 ## Complete ETL Commands Reference (Docker)
 
-All commands below assume you are inside the ETL container (`docker exec -it nyc-taxi-etl bash`).
+All commands below assume you are inside the ETL container (`docker exec -it nyc-taxi-etl-etl bash`).
 
 ### Bronze Layer - Data Ingestion
 
@@ -213,7 +213,7 @@ Run the complete pipeline for January 2024 yellow taxi data:
 
 ```bash
 # Enter container
-docker exec -it nyc-taxi-etl bash
+docker exec -it nyc-taxi-etl-etl bash
 
 # Step 1: Ingest zone lookup (one-time setup)
 python -m etl.jobs.bronze.zone_lookup_ingestion_job
@@ -250,13 +250,13 @@ Alternative using `docker exec`:
 
 ```bash
 # Ingestion
-docker exec nyc-taxi-etl python -m etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --month 1
+docker exec nyc-taxi-etl-etl python -m etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --month 1
 
 # Transformation
-docker exec nyc-taxi-etl python -m etl.jobs.gold.taxi_gold_job --taxi-type yellow --year 2024 --month 1
+docker exec nyc-taxi-etl-etl python -m etl.jobs.gold.taxi_gold_job --taxi-type yellow --year 2024 --month 1
 
 # Load
-docker exec nyc-taxi-etl python -m etl.jobs.load.postgres_load_job --taxi-type yellow --year 2024 --month 1
+docker exec nyc-taxi-etl-etl python -m etl.jobs.load.postgres_load_job --taxi-type yellow --year 2024 --month 1
 ```
 
 ## Environment Variables
@@ -264,11 +264,16 @@ docker exec nyc-taxi-etl python -m etl.jobs.load.postgres_load_job --taxi-type y
 The `.env` file contains configuration:
 
 ```bash
+# Project Configuration
+PROJECT_ID_BASE=nyc-taxi-etl  # Used for container naming (e.g., nyc-taxi-etl-etl, nyc-taxi-etl-postgres)
+
 # PostgreSQL Configuration
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=nyc_taxi
 ```
+
+> **Note:** Container names follow the pattern `${PROJECT_ID_BASE}-<service>`. The default `PROJECT_ID_BASE` is `nyc-taxi-etl`, resulting in container names like `nyc-taxi-etl-etl`, `nyc-taxi-etl-postgres`, etc.
 
 ## Accessing Services
 
@@ -331,7 +336,7 @@ The ETL container runs `tail -f /dev/null` to stay alive. If it exits:
 
 ```bash
 # Check logs
-docker logs nyc-taxi-etl
+docker logs nyc-taxi-etl-etl
 
 # Rebuild container
 docker-compose build etl
@@ -349,7 +354,7 @@ The `./etl` folder is mounted as a volume, so code changes are reflected immedia
 vim etl/jobs/bronze/taxi_ingestion_job.py
 
 # Run updated code in container
-docker exec -it nyc-taxi-etl python -m etl.jobs.bronze.taxi_ingestion_job --help
+docker exec -it nyc-taxi-etl-etl python -m etl.jobs.bronze.taxi_ingestion_job --help
 ```
 
 ### Running Tests
