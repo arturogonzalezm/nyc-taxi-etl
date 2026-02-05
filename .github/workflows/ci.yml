@@ -173,6 +173,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Load config from terraform.tfvars
+        id: config
+        run: |
+          # Parse terraform.tfvars and export as environment variables
+          while IFS='=' read -r key value; do
+            # Skip empty lines and comments
+            [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+            # Clean up key and value
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
+            # Export to GITHUB_ENV (uppercase key)
+            echo "${key^^}=$value" >> $GITHUB_ENV
+          done < terraform/config.tfvars
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -194,10 +208,10 @@ jobs:
       - name: Import existing resources if needed
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-002"
-          SA_EMAIL="nyc-taxi-etl-${{ env.ENVIRONMENT }}-sa-002@${PROJECT_ID}.iam.gserviceaccount.com"
-          BUCKET_DATA="nyc-taxi-etl-${{ env.ENVIRONMENT }}-gcs-us-central1-002"
-          BUCKET_STATE="nyc-taxi-etl-tfstate-${{ env.ENVIRONMENT }}"
+          PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+          SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-gcs-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
 
           TF_VARS="-var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
 
@@ -262,6 +276,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Load config from terraform.tfvars
+        id: config
+        run: |
+          # Parse terraform.tfvars and export as environment variables
+          while IFS='=' read -r key value; do
+            # Skip empty lines and comments
+            [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+            # Clean up key and value
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
+            # Export to GITHUB_ENV (uppercase key)
+            echo "${key^^}=$value" >> $GITHUB_ENV
+          done < terraform/config.tfvars
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -283,10 +311,10 @@ jobs:
       - name: Import existing resources if needed
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-002"
-          SA_EMAIL="nyc-taxi-etl-${{ env.ENVIRONMENT }}-sa-002@${PROJECT_ID}.iam.gserviceaccount.com"
-          BUCKET_DATA="nyc-taxi-etl-${{ env.ENVIRONMENT }}-gcs-us-central1-002"
-          BUCKET_STATE="nyc-taxi-etl-tfstate-${{ env.ENVIRONMENT }}"
+          PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+          SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-gcs-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
 
           TF_VARS="-var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
 
