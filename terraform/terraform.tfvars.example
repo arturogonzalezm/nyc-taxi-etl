@@ -1,8 +1,8 @@
 # GCP Configuration
 project_id_base    = "nyc-taxi-etl"
 environment        = "dev"
-instance_number    = "001"
-bucket_suffix      = "001"
+instance_number    = "002"
+bucket_suffix      = "002"
 resource_type      = "gcs"
 project_name       = "NYC Taxi Pipeline"
 billing_account_id = "XXXX-XXXX-XXXX"
