@@ -330,10 +330,10 @@ class TestTaxiGoldJobLoadMethod:
             mock_writer.partitionBy.return_value = mock_writer
             mock_writer.parquet = MagicMock()
             if is_fact:
-                # Fact table needs select for partition info and filter for validation
-                mock_df.select.return_value.distinct.return_value.collect.return_value = (
-                    []
-                )
+                # Fact table needs select for partition info
+                # and filter for validation
+                select_rv = mock_df.select.return_value
+                select_rv.distinct.return_value.collect.return_value = []
                 mock_df.filter.return_value.count.return_value = 0
                 mock_df.filter.return_value.limit.return_value.count.return_value = 0
             return mock_df
@@ -367,10 +367,10 @@ class TestTaxiGoldJobLoadMethod:
             mock_writer.partitionBy.return_value = mock_writer
             mock_writer.parquet = MagicMock()
             if is_fact:
-                # Fact table needs select for partition info and filter for validation
-                mock_df.select.return_value.distinct.return_value.collect.return_value = (
-                    []
-                )
+                # Fact table needs select for partition info
+                # and filter for validation
+                select_rv = mock_df.select.return_value
+                select_rv.distinct.return_value.collect.return_value = []
                 mock_df.filter.return_value.count.return_value = 0
                 mock_df.filter.return_value.limit.return_value.count.return_value = 0
             return mock_df

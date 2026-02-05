@@ -46,6 +46,11 @@ source = ["etl", "dags", "tests"]
 branch = true
 omit = ["*/__init__.py"]
 
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503", "W293"]
+exclude = [".venv", "__pycache__", ".git", "build", "dist"]
+
 [tool.coverage.report]
 exclude_lines = [
     "pragma: no cover",
