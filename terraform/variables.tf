@@ -20,6 +20,12 @@ variable "billing_account_id" {
   sensitive   = true
 }
 
+variable "organisation_id" {
+  description = "GCP Organisation ID"
+  type        = string
+  sensitive   = true
+}
+
 # =============================================================================
 # LOCATION CONFIGURATION
 # =============================================================================

@@ -8,18 +8,20 @@ terraform {
     }
   }
 
-  # Remote backend for shared state (uncomment after creating the bucket)
-  # For organizations: This enables fully automatic deployments
-  # For individuals without org: Create the state bucket manually first, then uncomment
+  # =============================================================================
+  # REMOTE BACKEND FOR TERRAFORM STATE
+  # =============================================================================
+  # FIRST RUN: Comment out the backend block, run locally with your credentials
+  # AFTER FIRST RUN: Uncomment and run: terraform init -migrate-state
   #
   # backend "gcs" {
-  #   bucket = "nyc-taxi-etl-tfstate"
+  #   bucket = "nyc-taxi-etl-tfstate-dev"  # Change to -prod for production
   #   prefix = "terraform/state"
   # }
 }
 
 provider "google" {
-  # Uses ADC from:
-  # - Local: gcloud auth application-default login
-  # - CI/CD: Workload Identity Federation
+  # Authentication (in order of precedence):
+  # 1. CI/CD: Workload Identity Federation (automatic)
+  # 2. Local: gcloud auth application-default login
 }

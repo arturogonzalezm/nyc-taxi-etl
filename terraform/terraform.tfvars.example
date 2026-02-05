@@ -1,10 +1,3 @@
-# =============================================================================
-# NYC TAXI PIPELINE - TERRAFORM VARIABLES
-# =============================================================================
-# Copy this file to terraform.tfvars and update the values.
-# The Python ETL jobs can parse this file to get GCP_PROJECT_ID and GCS_BUCKET.
-# =============================================================================
-
 # GCP Configuration
 project_id_base    = "nyc-taxi-etl"
 environment        = "dev"
@@ -12,24 +5,10 @@ instance_number    = "001"
 bucket_suffix      = "001"
 resource_type      = "gcs"
 project_name       = "NYC Taxi Pipeline"
-billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
+billing_account_id = "XXXX-XXXX-XXXX"
 region             = "us-central1"
 zone               = "us-central1-a"
-
-# Billing Account (REQUIRED - get from: gcloud billing accounts list)
-billing_account_id = "XXXXXX-XXXXXX-XXXXXX"
+organisation_id    = "xxxxxxxxxx"
 
 # GitHub Configuration (for Workload Identity Federation)
-github_repository = "your-org/nyc-taxi-etl"  # e.g., "myorg/nyc-taxi-etl"
-
-# =============================================================================
-# COMPUTED VALUES (for reference - DO NOT SET MANUALLY)
-# =============================================================================
-# These are computed by Terraform locals and used in Python via terraform_config.py:
-#
-# GCP_PROJECT_ID = ${project_id_base}-${environment}-${region}-${instance_number}
-#                = nyc-taxi-etl-dev-us-central1-001
-#
-# GCS_BUCKET     = ${project_id_base}-${environment}-${resource_type}-${region}-${bucket_suffix}
-#                = nyc-taxi-etl-dev-gcs-us-central1-001
-# =============================================================================
+github_repository = "myorg/nyc-taxi-etl"

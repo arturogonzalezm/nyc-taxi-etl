@@ -28,7 +28,7 @@ class TestGCSConfig:
             # Should fall back to terraform.tfvars
             config = GCSConfig()
             assert config.bucket == "nyc-taxi-etl-dev-gcs-us-central1-001"
-            assert config.project_id == "nyc-taxi-etl-dev-us-central1-001"
+            assert config.project_id == "nyc-taxi-etl-dev-001"
 
     def test_custom_values_from_env(self):
         """Test GCSConfig reads from environment variables."""

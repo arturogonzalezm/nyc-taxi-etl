@@ -227,3 +227,4 @@ terraform/terraform.tfvars
 terraform/*.json
 terraform/nyc-taxi-etl-*.json
 *.DS_Store
+terraform.tfvars
