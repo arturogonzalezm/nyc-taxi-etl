@@ -639,19 +639,19 @@ class TestTaxiGoldJobTransformMethod:
         # Mock all internal methods
         with patch.object(job, "_remove_duplicates", return_value=mock_trips_df):
             with patch.object(
-                    job, "_apply_data_quality_filters", return_value=mock_trips_df
+                job, "_apply_data_quality_filters", return_value=mock_trips_df
             ):
                 with patch.object(
-                        job, "_standardize_schema", return_value=mock_trips_df
+                    job, "_standardize_schema", return_value=mock_trips_df
                 ):
                     with patch.object(
-                            job, "_create_dim_date", return_value=MagicMock()
+                        job, "_create_dim_date", return_value=MagicMock()
                     ):
                         with patch.object(
-                                job, "_create_dim_location", return_value=MagicMock()
+                            job, "_create_dim_location", return_value=MagicMock()
                         ):
                             with patch.object(
-                                    job, "_create_dim_payment", return_value=MagicMock()
+                                job, "_create_dim_payment", return_value=MagicMock()
                             ):
                                 with patch.object(
                                     job,
@@ -678,22 +678,22 @@ class TestTaxiGoldJobTransformMethod:
         mock_trips_df.count.return_value = 500
 
         with patch.object(
-                job, "_remove_duplicates", return_value=mock_trips_df
+            job, "_remove_duplicates", return_value=mock_trips_df
         ) as mock_dedup:
             with patch.object(
-                    job, "_apply_data_quality_filters", return_value=mock_trips_df
+                job, "_apply_data_quality_filters", return_value=mock_trips_df
             ) as mock_filter:
                 with patch.object(
-                        job, "_standardize_schema", return_value=mock_trips_df
+                    job, "_standardize_schema", return_value=mock_trips_df
                 ) as mock_schema:
                     with patch.object(
-                            job, "_create_dim_date", return_value=MagicMock()
+                        job, "_create_dim_date", return_value=MagicMock()
                     ):
                         with patch.object(
-                                job, "_create_dim_location", return_value=MagicMock()
+                            job, "_create_dim_location", return_value=MagicMock()
                         ):
                             with patch.object(
-                                    job, "_create_dim_payment", return_value=MagicMock()
+                                job, "_create_dim_payment", return_value=MagicMock()
                             ):
                                 with patch.object(
                                     job,

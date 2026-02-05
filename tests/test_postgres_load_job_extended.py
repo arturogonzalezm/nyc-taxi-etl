@@ -360,7 +360,7 @@ class TestPostgresLoadJobLoadFactTable:
         mock_df.count.return_value = 100
 
         with patch.object(
-                job, "_upsert_via_temp_table", side_effect=Exception("Upsert failed")
+            job, "_upsert_via_temp_table", side_effect=Exception("Upsert failed")
         ):
             with pytest.raises(JobExecutionError, match="Failed to upsert fact_trip"):
                 job._load_fact_table(mock_df)

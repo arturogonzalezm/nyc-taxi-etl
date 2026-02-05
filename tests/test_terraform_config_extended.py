@@ -210,11 +210,11 @@ class TestGetGcpConfigWithFallback:
     def test_fallback_uses_env_vars_when_set(self):
         """Test fallback uses environment variables when both are set."""
         with patch.dict(
-                os.environ,
-                {
-                    "GCP_PROJECT_ID": "env-project-id",
-                    "GCS_BUCKET": "env-bucket-name",
-                },
+            os.environ,
+            {
+                "GCP_PROJECT_ID": "env-project-id",
+                "GCS_BUCKET": "env-bucket-name",
+            },
         ):
             project_id, bucket = get_gcp_config_with_fallback()
 
@@ -236,7 +236,7 @@ class TestGetGcpConfigWithFallback:
 
         with patch.dict(os.environ, {}, clear=True):
             with patch(
-                    "etl.jobs.utils.terraform_config.get_gcp_config"
+                "etl.jobs.utils.terraform_config.get_gcp_config"
             ) as mock_get_config:
                 mock_get_config.return_value = ("tfvars-project-id", "tfvars-bucket")
                 project_id, bucket = get_gcp_config_with_fallback()
@@ -248,12 +248,12 @@ class TestGetGcpConfigWithFallback:
     def test_fallback_partial_env_vars(self):
         """Test fallback with only one env var set."""
         with patch.dict(
-                os.environ,
-                {"GCP_PROJECT_ID": "env-project", "GCS_BUCKET": ""},
-                clear=True,
+            os.environ,
+            {"GCP_PROJECT_ID": "env-project", "GCS_BUCKET": ""},
+            clear=True,
         ):
             with patch(
-                    "etl.jobs.utils.terraform_config.get_gcp_config"
+                "etl.jobs.utils.terraform_config.get_gcp_config"
             ) as mock_get_config:
                 mock_get_config.return_value = ("tf-project", "tf-bucket")
                 project_id, bucket = get_gcp_config_with_fallback()
@@ -265,8 +265,8 @@ class TestGetGcpConfigWithFallback:
         """Test fallback handles missing terraform.tfvars gracefully."""
         with patch.dict(os.environ, {}, clear=True):
             with patch(
-                    "etl.jobs.utils.terraform_config.get_gcp_config",
-                    side_effect=FileNotFoundError("Not found"),
+                "etl.jobs.utils.terraform_config.get_gcp_config",
+                side_effect=FileNotFoundError("Not found"),
             ):
                 project_id, bucket = get_gcp_config_with_fallback()
 
@@ -278,8 +278,8 @@ class TestGetGcpConfigWithFallback:
         """Test fallback handles KeyError from terraform.tfvars."""
         with patch.dict(os.environ, {}, clear=True):
             with patch(
-                    "etl.jobs.utils.terraform_config.get_gcp_config",
-                    side_effect=KeyError("Missing vars"),
+                "etl.jobs.utils.terraform_config.get_gcp_config",
+                side_effect=KeyError("Missing vars"),
             ):
                 project_id, bucket = get_gcp_config_with_fallback()
 
@@ -289,14 +289,14 @@ class TestGetGcpConfigWithFallback:
     def test_fallback_env_vars_take_priority(self):
         """Test environment variables take priority over tfvars."""
         with patch.dict(
-                os.environ,
-                {
-                    "GCP_PROJECT_ID": "priority-project",
-                    "GCS_BUCKET": "priority-bucket",
-                },
+            os.environ,
+            {
+                "GCP_PROJECT_ID": "priority-project",
+                "GCS_BUCKET": "priority-bucket",
+            },
         ):
             with patch(
-                    "etl.jobs.utils.terraform_config.get_gcp_config"
+                "etl.jobs.utils.terraform_config.get_gcp_config"
             ) as mock_get_config:
                 # This should not be called since env vars are set
                 mock_get_config.return_value = ("tfvars-project", "tfvars-bucket")
