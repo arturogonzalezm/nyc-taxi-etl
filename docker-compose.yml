@@ -8,6 +8,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    PROJECT_ID_BASE: ${PROJECT_ID_BASE:-nyc-taxi-etl}
     POSTGRES_HOST: postgres
     POSTGRES_PORT: 5432
     POSTGRES_USER: ${POSTGRES_USER:-postgres}
