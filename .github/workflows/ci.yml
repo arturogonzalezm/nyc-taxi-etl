@@ -191,6 +191,19 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform init
 
+      - name: Import existing project if needed
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-001"
+          if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+            terraform import \
+              -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="organisation_id=${{ secrets.GCP_ORGANISATION_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_project.nyc_taxi_project "$PROJECT_ID" 2>/dev/null || true
+          fi
+
       - name: Terraform Plan
         working-directory: ${{ env.WORKING_DIR }}
         run: |
@@ -240,6 +253,19 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.WORKING_DIR }}
         run: terraform init
+
+      - name: Import existing project if needed
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-001"
+          if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+            terraform import \
+              -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+              -var="organisation_id=${{ secrets.GCP_ORGANISATION_ID }}" \
+              -var="github_repository=${{ github.repository }}" \
+              -var="environment=${{ env.ENVIRONMENT }}" \
+              google_project.nyc_taxi_project "$PROJECT_ID" 2>/dev/null || true
+          fi
 
       - name: Terraform Plan
         working-directory: ${{ env.WORKING_DIR }}
