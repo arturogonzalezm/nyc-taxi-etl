@@ -210,7 +210,7 @@ jobs:
         run: |
           PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
           SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
-          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
           BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
 
           TF_VARS="-var-file=config.tfvars -var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
@@ -285,7 +285,7 @@ jobs:
               exit 1
             fi
             
-            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
+            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
             if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
               echo "✓ Data bucket exists: $BUCKET_DATA"
             else
@@ -353,7 +353,7 @@ jobs:
         run: |
           PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
           SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
-          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
           BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
 
           TF_VARS="-var-file=config.tfvars -var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
@@ -428,7 +428,7 @@ jobs:
               exit 1
             fi
             
-            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${BUCKET_SUFFIX}"
+            BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
             if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
               echo "✓ Data bucket exists: $BUCKET_DATA"
             else

@@ -2,7 +2,6 @@
 project_id_base    = "nyc-taxi-etl"
 environment        = "dev"
 instance_number    = "003"
-bucket_suffix      = "003"
 resource_type      = "gcs"
 project_name       = "NYC Taxi Pipeline"
 billing_account_id = "XXXX-XXXX-XXXX"

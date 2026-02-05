@@ -69,7 +69,7 @@ The project includes Terraform configuration for automated GCP infrastructure pr
 
 - **GCP Project** with billing configuration
 - **Service Account** for pipeline operations
-- **GCS Bucket** for data lake storage (pattern: `${project_id_base}-${environment}-gcs-${region}-${bucket_suffix}`)
+- **GCS Bucket** for data lake storage (pattern: `${project_id_base}-${environment}-gcs-${region}-${instance_number}`)
 - **Workload Identity Federation** for secure GitHub Actions authentication
 - **IAM Roles** for storage and BigQuery access
 
@@ -346,7 +346,7 @@ Configure via environment variables or a secrets manager.
 | Variable | Description | Default |
 |----------|-------------|----------|
 | `STORAGE_BACKEND` | Storage backend (`gcs`) | `gcs` |
-| `GCS_BUCKET` | GCS bucket name | Set via `.env` (pattern: `${project_id_base}-${environment}-gcs-${region}-${bucket_suffix}`) |
+| `GCS_BUCKET` | GCS bucket name | Set via `.env` (pattern: `${project_id_base}-${environment}-gcs-${region}-${instance_number}`) |
 | `GCP_PROJECT_ID` | GCP project ID | Set via `.env` (pattern: `${project_id_base}-${environment}-${region}-${instance_number}`) |
 
 ### Database Configuration

@@ -57,10 +57,6 @@ variable "instance_number" {
   type        = string
 }
 
-variable "bucket_suffix" {
-  description = "Bucket suffix number (e.g., 001, 002)"
-  type        = string
-}
 
 variable "resource_type" {
   description = "GCP Resource (e.g., gcs, sa, iam, bigquery, cr, cc, network, etc)"
@@ -89,5 +85,5 @@ variable "github_repository" {
 locals {
   # Construct the full project ID: nyc-taxi-etl-dev-001 (max 30 chars)
   full_project_id = "${var.project_id_base}-${var.environment}-${var.instance_number}"
-  full_bucket_id  = "${var.project_id_base}-${var.environment}-${var.resource_type}-${var.region}-${var.bucket_suffix}"
+  full_bucket_id  = "${var.project_id_base}-${var.environment}-${var.resource_type}-${var.region}-${var.instance_number}"
 }

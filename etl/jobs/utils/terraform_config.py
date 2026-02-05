@@ -56,7 +56,7 @@ def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
 
     Uses the same patterns as Terraform locals (variables.tf):
     - full_project_id: ${project_id_base}-${environment}-${region}-${instance_number}
-    - full_bucket_id: ${project_id_base}-${environment}-${resource_type}-${region}-${bucket_suffix}
+    - full_bucket_id: ${project_id_base}-${environment}-${resource_type}-${region}-${instance_number}
 
     :param "tfvars_path: Optional path to terraform.tfvars file.
     :returns: Tuple of (project_id, bucket_name)
@@ -70,7 +70,6 @@ def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
         "environment",
         "region",
         "instance_number",
-        "bucket_suffix",
         "resource_type",
     ]
     missing = [v for v in required_vars if v not in tfvars]
@@ -91,7 +90,7 @@ def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
         f"{tfvars['environment']}-"
         f"{tfvars['resource_type']}-"
         f"{tfvars['region']}-"
-        f"{tfvars['bucket_suffix']}"
+        f"{tfvars['instance_number']}"
     )
 
     return project_id, bucket_name

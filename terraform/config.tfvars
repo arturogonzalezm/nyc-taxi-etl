@@ -14,7 +14,6 @@ project_name    = "NYC Taxi Pipeline"
 
 # Instance numbering
 instance_number = "003"
-bucket_suffix   = "003"
 
 # Resource type for bucket naming
 resource_type = "gcs"

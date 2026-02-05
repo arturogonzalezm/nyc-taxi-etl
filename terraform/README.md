@@ -150,7 +150,7 @@ Terraform state is currently stored locally. For production environments, consid
 |---------------|-----------------|-------------|
 | GCP Project | `${project_id_base}-${environment}-${region}-${instance_number}` | Primary project for all resources |
 | Service Account | `${project_id_base}-${environment}-sa-${instance_number}@<project_id>.iam.gserviceaccount.com` | Service account for pipeline operations |
-| GCS Bucket | `${project_id_base}-${environment}-gcs-${region}-${bucket_suffix}` | Data lake storage bucket |
+| GCS Bucket | `${project_id_base}-${environment}-gcs-${region}-${instance_number}` | Data lake storage bucket |
 | Workload Identity Pool | `github-actions-pool` | Identity pool for GitHub Actions |
 | Workload Identity Provider | `github-provider` | OIDC provider for GitHub authentication |
 
@@ -175,7 +175,7 @@ The service account is granted the following roles:
 | `zone` | string | `us-central1-a` | GCP Zone |
 | `environment` | string | `dev` | Environment name (dev, prod) |
 | `instance_number` | string | `001` | Instance number for uniqueness |
-| `bucket_suffix` | string | `001` | Bucket suffix number for uniqueness |
+| `instance_number` | string | `001` | Instance number for resource naming |
 | `resource_type` | string | `gcs` | Resource discriminator used in bucket naming |
 | `github_repository` | string | - | GitHub repository for Workload Identity Federation (required) |
 
