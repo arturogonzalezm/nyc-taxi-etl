@@ -35,5 +35,8 @@ with DAG(
 
     load_to_postgres = BashOperator(
         task_id="load_to_postgres",
-        bash_command=f"docker exec {ETL_CONTAINER} python -m etl.jobs.load.postgres_load_job --taxi-type {{{{ params.taxi_type }}}}",
+        bash_command=(
+            f"docker exec {ETL_CONTAINER} python -m etl.jobs.load.postgres_load_job "
+            "--taxi-type {{ params.taxi_type }}"
+        ),
     )

@@ -32,5 +32,8 @@ with DAG(
 
     ingest_zone_lookup = BashOperator(
         task_id="ingest_zone_lookup",
-        bash_command=f"docker exec {ETL_CONTAINER} python -m etl.jobs.bronze.zone_lookup_ingestion_job",
+        bash_command=(
+            f"docker exec {ETL_CONTAINER} "
+            "python -m etl.jobs.bronze.zone_lookup_ingestion_job"
+        ),
     )

@@ -66,8 +66,11 @@ class BaseSparkJob(ABC):
     def __init__(self, job_name: str, config: Optional[JobConfig] = None):
         """
         Initialise the ETL job.
-        :params job_name: Unique identifier for the job (used for logging and monitoring)
-        :params config: Job configuration instance (uses singleton default if not provided)
+
+        :params job_name: Unique identifier for the job
+            (used for logging and monitoring)
+        :params config: Job configuration instance
+            (uses singleton default if not provided)
 
         Raises:
             ValueError: If job_name is empty or invalid
