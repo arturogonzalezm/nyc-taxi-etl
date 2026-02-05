@@ -225,14 +225,16 @@ jobs:
             terraform import $TF_VARS google_service_account.nyc_taxi_sa "projects/${PROJECT_ID}/serviceAccounts/${SA_EMAIL}" 2>/dev/null || true
           fi
 
-          # Import workload identity pool
+          # Import workload identity pool (requires project number, not project ID)
           if gcloud iam workload-identity-pools describe github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
-            terraform import $TF_VARS google_iam_workload_identity_pool.github_pool "${PROJECT_ID}/global/github-actions-pool" 2>/dev/null || true
+            PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+            terraform import $TF_VARS google_iam_workload_identity_pool.github_pool "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool" 2>/dev/null || true
           fi
 
           # Import workload identity provider
           if gcloud iam workload-identity-pools providers describe github-provider --workload-identity-pool=github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
-            terraform import $TF_VARS google_iam_workload_identity_pool_provider.github_provider "${PROJECT_ID}/global/github-actions-pool/github-provider" 2>/dev/null || true
+            PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+            terraform import $TF_VARS google_iam_workload_identity_pool_provider.github_provider "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" 2>/dev/null || true
           fi
 
           # Import GCS buckets
@@ -328,14 +330,16 @@ jobs:
             terraform import $TF_VARS google_service_account.nyc_taxi_sa "projects/${PROJECT_ID}/serviceAccounts/${SA_EMAIL}" 2>/dev/null || true
           fi
 
-          # Import workload identity pool
+          # Import workload identity pool (requires project number, not project ID)
           if gcloud iam workload-identity-pools describe github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
-            terraform import $TF_VARS google_iam_workload_identity_pool.github_pool "${PROJECT_ID}/global/github-actions-pool" 2>/dev/null || true
+            PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+            terraform import $TF_VARS google_iam_workload_identity_pool.github_pool "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool" 2>/dev/null || true
           fi
 
           # Import workload identity provider
           if gcloud iam workload-identity-pools providers describe github-provider --workload-identity-pool=github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
-            terraform import $TF_VARS google_iam_workload_identity_pool_provider.github_provider "${PROJECT_ID}/global/github-actions-pool/github-provider" 2>/dev/null || true
+            PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+            terraform import $TF_VARS google_iam_workload_identity_pool_provider.github_provider "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" 2>/dev/null || true
           fi
 
           # Import GCS buckets
