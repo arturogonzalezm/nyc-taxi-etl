@@ -194,7 +194,7 @@ jobs:
       - name: Import existing project if needed
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-001"
+          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-002"
           if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
             terraform import \
               -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
@@ -257,7 +257,7 @@ jobs:
       - name: Import existing project if needed
         working-directory: ${{ env.WORKING_DIR }}
         run: |
-          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-001"
+          PROJECT_ID="nyc-taxi-etl-${{ env.ENVIRONMENT }}-002"
           if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
             terraform import \
               -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
