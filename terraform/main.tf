@@ -4,7 +4,7 @@
 
 # Create GCP Project within Organization
 resource "google_project" "nyc_taxi_project" {
-  name            = "${var.project_name} (${var.environment})"
+  name            = "${var.project_name} - ${var.environment}"
   project_id      = local.full_project_id
   org_id          = var.organisation_id
   billing_account = var.billing_account_id
