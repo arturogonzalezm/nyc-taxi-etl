@@ -41,11 +41,19 @@ class GCSConfig:
     gold_path: str = "gold/nyc_taxi"
 
     def __post_init__(self):
-        """Validate configuration after initialization."""
+        """
+        Validate configuration after initialization.
+
+        :raises ValueError: If configuration validation fails
+        """
         self._validate()
 
     def _validate(self):
-        """Validate all required configuration values."""
+        """
+        Validate all required configuration values.
+
+        :raises ValueError: If validation fails
+        """
         errors = []
 
         if not self.bucket:
@@ -87,13 +95,21 @@ class JobConfig:
     _initialized: bool = False
 
     def __new__(cls):
-        """Singleton pattern: ensure only one instance exists"""
+        """
+        Singleton pattern: ensure only one instance exists
+
+        :returns Singleton instance
+        """
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
-        """Initialize configuration (only once due to singleton)"""
+        """
+        Initialise configuration (only once due to singleton)
+
+        :raises ValueError: If configuration validation fails
+        """
         # Only initialize once
         if JobConfig._initialized:
             return
@@ -138,15 +154,10 @@ class JobConfig:
         """
         Get GCS storage path for given layer and taxi type.
 
-        Args:
-            layer: Data lake layer (bronze, silver, gold)
-            taxi_type: Type of taxi (yellow, green) - optional
-
-        Returns:
-            Full GCS storage path (gs://)
-
-        Raises:
-            ValueError: If layer is invalid
+        :param layer: Data lake layer (bronze, silver, gold)
+        :param taxi_type: Type of taxi (yellow, green) - optional
+        :returns Full GCS storage path (gs://)
+        :raises ValueError: If layer is invalid
 
         Examples:
             >>> config = JobConfig()
