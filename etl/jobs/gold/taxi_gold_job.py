@@ -517,10 +517,10 @@ class TaxiGoldJob(BaseSparkJob):
         # Calculate date range boundaries for filtering
         # Start: first day of start month, End: last day of end month
         start_date = date(self.year, self.month, 1)
-        end_date = date(self.end_year, self.end_month, 1) + relativedelta(months=1, days=-1)
-        self.logger.info(
-            f"Filtering records to date range: {start_date} to {end_date}"
+        end_date = date(self.end_year, self.end_month, 1) + relativedelta(
+            months=1, days=-1
         )
+        self.logger.info(f"Filtering records to date range: {start_date} to {end_date}")
 
         # Add quality flags
         df_with_flags = (
@@ -578,16 +578,26 @@ class TaxiGoldJob(BaseSparkJob):
         )
 
         # Log quality metrics by category
-        out_of_range_count = df_with_flags.filter(F.col("has_out_of_range_date")).count()
-        null_timestamps_count = df_with_flags.filter(F.col("has_null_timestamps")).count()
+        out_of_range_count = df_with_flags.filter(
+            F.col("has_out_of_range_date")
+        ).count()
+        null_timestamps_count = df_with_flags.filter(
+            F.col("has_null_timestamps")
+        ).count()
         invalid_fare_count = df_with_flags.filter(F.col("has_invalid_fare")).count()
-        invalid_distance_count = df_with_flags.filter(F.col("has_invalid_distance")).count()
-        invalid_duration_count = df_with_flags.filter(F.col("has_invalid_duration")).count()
+        invalid_distance_count = df_with_flags.filter(
+            F.col("has_invalid_distance")
+        ).count()
+        invalid_duration_count = df_with_flags.filter(
+            F.col("has_invalid_duration")
+        ).count()
         total_invalid = df_with_flags.filter(~F.col("is_valid_record")).count()
 
         self.logger.info("Data quality summary:")
         self.logger.info(f"  Initial records: {initial_count:,}")
-        self.logger.info(f"  Out-of-range dates: {out_of_range_count:,} (filtered to {start_date} - {end_date})")
+        self.logger.info(
+            f"  Out-of-range dates: {out_of_range_count:,} (filtered to {start_date} - {end_date})"
+        )
         self.logger.info(f"  Null timestamps: {null_timestamps_count:,}")
         self.logger.info(f"  Invalid fares: {invalid_fare_count:,}")
         self.logger.info(f"  Invalid distances: {invalid_distance_count:,}")
