@@ -217,57 +217,43 @@ class TestPostgresLoadJobLoadDimension:
         """Reset JobConfig singleton after each test."""
         JobConfig.reset()
 
-    def test_load_dimension_truncates_table(self):
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
+    def test_load_dimension_truncates_table(self, mock_psycopg2):
         """Test _load_dimension truncates table before insert."""
-        import sys
+        job = PostgresLoadJob("yellow")
 
-        mock_psycopg2 = MagicMock()
-        sys.modules["psycopg2"] = mock_psycopg2
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_psycopg2.connect.return_value = mock_conn
 
-        try:
-            job = PostgresLoadJob("yellow")
+        mock_df = MagicMock()
+        mock_df.count.return_value = 100
 
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        job._load_dimension(mock_df, "taxi.dim_date", "dim_date")
 
-            mock_df = MagicMock()
-            mock_df.count.return_value = 100
+        # Verify TRUNCATE was executed
+        mock_cursor.execute.assert_called()
+        truncate_call = mock_cursor.execute.call_args[0][0]
+        assert "TRUNCATE" in truncate_call
 
-            job._load_dimension(mock_df, "taxi.dim_date", "dim_date")
-
-            # Verify TRUNCATE was executed
-            mock_cursor.execute.assert_called()
-            truncate_call = mock_cursor.execute.call_args[0][0]
-            assert "TRUNCATE" in truncate_call
-        finally:
-            del sys.modules["psycopg2"]
-
-    def test_load_dimension_writes_via_jdbc(self):
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
+    def test_load_dimension_writes_via_jdbc(self, mock_psycopg2):
         """Test _load_dimension writes data via Spark JDBC."""
-        import sys
+        job = PostgresLoadJob("yellow")
 
-        mock_psycopg2 = MagicMock()
-        sys.modules["psycopg2"] = mock_psycopg2
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_psycopg2.connect.return_value = mock_conn
 
-        try:
-            job = PostgresLoadJob("yellow")
+        mock_df = MagicMock()
+        mock_df.count.return_value = 100
 
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        job._load_dimension(mock_df, "taxi.dim_date", "dim_date")
 
-            mock_df = MagicMock()
-            mock_df.count.return_value = 100
-
-            job._load_dimension(mock_df, "taxi.dim_date", "dim_date")
-
-            # Verify JDBC write was called
-            mock_df.write.jdbc.assert_called_once()
-        finally:
-            del sys.modules["psycopg2"]
+        # Verify JDBC write was called
+        mock_df.write.jdbc.assert_called_once()
 
     def test_load_dimension_handles_psycopg2_error(self):
         """Test _load_dimension handles psycopg2 errors."""
@@ -289,35 +275,28 @@ class TestPostgresLoadJobLoadDimension:
         finally:
             del sys.modules["psycopg2"]
 
-    def test_load_dimension_parses_jdbc_url(self):
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
+    def test_load_dimension_parses_jdbc_url(self, mock_psycopg2):
         """Test _load_dimension correctly parses JDBC URL."""
-        import sys
+        job = PostgresLoadJob(
+            "yellow", postgres_url="jdbc:postgresql://myhost:5433/mydb"
+        )
 
-        mock_psycopg2 = MagicMock()
-        sys.modules["psycopg2"] = mock_psycopg2
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_psycopg2.connect.return_value = mock_conn
 
-        try:
-            job = PostgresLoadJob(
-                "yellow", postgres_url="jdbc:postgresql://myhost:5433/mydb"
-            )
+        mock_df = MagicMock()
+        mock_df.count.return_value = 50
 
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        job._load_dimension(mock_df, "taxi.dim_location", "dim_location")
 
-            mock_df = MagicMock()
-            mock_df.count.return_value = 50
-
-            job._load_dimension(mock_df, "taxi.dim_location", "dim_location")
-
-            # Verify connect was called with parsed parameters
-            connect_call = mock_psycopg2.connect.call_args
-            assert connect_call[1]["host"] == "myhost"
-            assert connect_call[1]["port"] == 5433
-            assert connect_call[1]["database"] == "mydb"
-        finally:
-            del sys.modules["psycopg2"]
+        # Verify connect was called with parsed parameters
+        connect_call = mock_psycopg2.connect.call_args
+        assert connect_call[1]["host"] == "myhost"
+        assert connect_call[1]["port"] == 5433
+        assert connect_call[1]["database"] == "mydb"
 
 
 class TestPostgresLoadJobLoadFactTable:
@@ -380,95 +359,77 @@ class TestPostgresLoadJobUpsert:
         """Reset JobConfig singleton after each test."""
         JobConfig.reset()
 
-    def test_upsert_creates_temp_table(self):
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
+    def test_upsert_creates_temp_table(self, mock_psycopg2):
         """Test _upsert_via_temp_table creates temporary table."""
-        import sys
-
-        mock_psycopg2 = MagicMock()
         mock_psycopg2.Error = Exception  # Make Error a proper exception class
-        sys.modules["psycopg2"] = mock_psycopg2
 
-        try:
-            job = PostgresLoadJob("yellow")
+        job = PostgresLoadJob("yellow")
 
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_cursor.fetchone.return_value = (0,)  # For row count queries
-            mock_cursor.fetchall.return_value = []  # For index queries
-            mock_cursor.rowcount = 10  # For rows affected formatting
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (0,)  # For row count queries
+        mock_cursor.fetchall.return_value = []  # For index queries
+        mock_cursor.rowcount = 10  # For rows affected formatting
+        mock_conn.cursor.return_value = mock_cursor
+        mock_psycopg2.connect.return_value = mock_conn
 
-            mock_df = MagicMock()
-            mock_df.columns = ["fact_hash", "col1", "col2"]
-            mock_df.count.return_value = 100  # For record count formatting
+        mock_df = MagicMock()
+        mock_df.columns = ["fact_hash", "col1", "col2"]
+        mock_df.count.return_value = 100  # For record count formatting
 
-            job._upsert_via_temp_table(mock_df, "taxi.fact_trip")
+        job._upsert_via_temp_table(mock_df, "taxi.fact_trip")
 
-            # Verify temp table operations
-            assert mock_cursor.execute.called
-        finally:
-            del sys.modules["psycopg2"]
+        # Verify temp table operations
+        assert mock_cursor.execute.called
 
-    def test_upsert_writes_to_temp_table(self):
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
+    def test_upsert_writes_to_temp_table(self, mock_psycopg2):
         """Test _upsert_via_temp_table writes data to temp table."""
-        import sys
-
-        mock_psycopg2 = MagicMock()
         mock_psycopg2.Error = Exception  # Make Error a proper exception class
-        sys.modules["psycopg2"] = mock_psycopg2
 
-        try:
-            job = PostgresLoadJob("yellow")
+        job = PostgresLoadJob("yellow")
 
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_cursor.fetchone.return_value = (0,)  # For row count queries
-            mock_cursor.fetchall.return_value = []  # For index queries
-            mock_cursor.rowcount = 10  # For rows affected formatting
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (0,)  # For row count queries
+        mock_cursor.fetchall.return_value = []  # For index queries
+        mock_cursor.rowcount = 10  # For rows affected formatting
+        mock_conn.cursor.return_value = mock_cursor
+        mock_psycopg2.connect.return_value = mock_conn
 
-            mock_df = MagicMock()
-            mock_df.columns = ["fact_hash", "amount"]
-            mock_df.count.return_value = 100  # For record count formatting
+        mock_df = MagicMock()
+        mock_df.columns = ["fact_hash", "amount"]
+        mock_df.count.return_value = 100  # For record count formatting
 
-            job._upsert_via_temp_table(mock_df, "taxi.fact_trip")
+        job._upsert_via_temp_table(mock_df, "taxi.fact_trip")
 
-            # Verify JDBC write was called
-            mock_df.write.jdbc.assert_called()
-        finally:
-            del sys.modules["psycopg2"]
+        # Verify JDBC write was called
+        mock_df.write.jdbc.assert_called()
 
-    def test_upsert_executes_merge_sql(self):
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
+    def test_upsert_executes_merge_sql(self, mock_psycopg2):
         """Test _upsert_via_temp_table executes INSERT ON CONFLICT."""
-        import sys
-
-        mock_psycopg2 = MagicMock()
         mock_psycopg2.Error = Exception  # Make Error a proper exception class
-        sys.modules["psycopg2"] = mock_psycopg2
 
-        try:
-            job = PostgresLoadJob("yellow")
+        job = PostgresLoadJob("yellow")
 
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_cursor.fetchone.return_value = (0,)  # For row count queries
-            mock_cursor.fetchall.return_value = []  # For index queries
-            mock_cursor.rowcount = 10  # For rows affected formatting
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (0,)  # For row count queries
+        mock_cursor.fetchall.return_value = []  # For index queries
+        mock_cursor.rowcount = 10  # For rows affected formatting
+        mock_conn.cursor.return_value = mock_cursor
+        mock_psycopg2.connect.return_value = mock_conn
 
-            mock_df = MagicMock()
-            mock_df.columns = ["fact_hash", "trip_id"]
-            mock_df.count.return_value = 100  # For record count formatting
+        mock_df = MagicMock()
+        mock_df.columns = ["fact_hash", "trip_id"]
+        mock_df.count.return_value = 100  # For record count formatting
 
-            job._upsert_via_temp_table(mock_df, "taxi.fact_trip")
+        job._upsert_via_temp_table(mock_df, "taxi.fact_trip")
 
-            # Verify SQL execution
-            assert mock_cursor.execute.called
-        finally:
-            del sys.modules["psycopg2"]
+        # Verify SQL execution
+        assert mock_cursor.execute.called
 
 
 class TestPostgresLoadJobLoad:
@@ -626,33 +587,26 @@ class TestPostgresLoadJobEdgeCases:
 
         assert "dim_date" in result
 
-    def test_load_dimension_with_default_port(self):
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
+    def test_load_dimension_with_default_port(self, mock_psycopg2):
         """Test _load_dimension uses default port when not specified."""
-        import sys
+        job = PostgresLoadJob(
+            "yellow", postgres_url="jdbc:postgresql://myhost/mydb"
+        )
 
-        mock_psycopg2 = MagicMock()
-        sys.modules["psycopg2"] = mock_psycopg2
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_psycopg2.connect.return_value = mock_conn
 
-        try:
-            job = PostgresLoadJob(
-                "yellow", postgres_url="jdbc:postgresql://myhost/mydb"
-            )
+        mock_df = MagicMock()
+        mock_df.count.return_value = 10
 
-            mock_conn = MagicMock()
-            mock_cursor = MagicMock()
-            mock_conn.cursor.return_value = mock_cursor
-            mock_psycopg2.connect.return_value = mock_conn
+        job._load_dimension(mock_df, "taxi.dim_date", "dim_date")
 
-            mock_df = MagicMock()
-            mock_df.count.return_value = 10
-
-            job._load_dimension(mock_df, "taxi.dim_date", "dim_date")
-
-            # Verify default port 5432 was used
-            connect_call = mock_psycopg2.connect.call_args
-            assert connect_call[1]["port"] == 5432
-        finally:
-            del sys.modules["psycopg2"]
+        # Verify default port 5432 was used
+        connect_call = mock_psycopg2.connect.call_args
+        assert connect_call[1]["port"] == 5432
 
 
 class TestPostgresLoadJobValidateInputs:
