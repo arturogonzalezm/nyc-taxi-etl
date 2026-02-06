@@ -562,12 +562,12 @@ resource "google_service_account_iam_member" "composer_act_as_cloudrun" {
 # =============================================================================
 # Grant the CI/CD service account permissions to deploy to production
 
-# Artifact Registry Writer - push container images
-resource "google_artifact_registry_repository_iam_member" "cicd_artifact_registry_writer" {
+# Artifact Registry Admin - push container images (includes uploadArtifacts permission)
+resource "google_artifact_registry_repository_iam_member" "cicd_artifact_registry_admin" {
   project    = var.project_id
   location   = var.region
   repository = google_artifact_registry_repository.etl_images.name
-  role       = "roles/artifactregistry.writer"
+  role       = "roles/artifactregistry.repoAdmin"
   member     = "serviceAccount:${var.cicd_service_account}"
 }
 
