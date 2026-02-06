@@ -1,5 +1,5 @@
 """
-DAG for Bronze Layer - Zone Lookup Ingestion
+DAG for Misc Layer - Zone Lookup Ingestion
 No date range parameters required.
 """
 
@@ -23,17 +23,17 @@ default_args = {
 with DAG(
     dag_id="zone_lookup_ingestion_dag",
     default_args=default_args,
-    description="Ingest taxi zone lookup reference data to Bronze layer",
+    description="Ingest taxi zone lookup reference data to Misc layer",
     schedule=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["bronze", "ingestion", "zone_lookup"],
+    tags=["misc", "ingestion", "zone_lookup"],
 ) as dag:
 
     ingest_zone_lookup = BashOperator(
         task_id="ingest_zone_lookup",
         bash_command=(
             f"docker exec {ETL_CONTAINER} "
-            "python -m etl.jobs.bronze.zone_lookup_ingestion_job"
+            "python -m etl.jobs.misc.zone_lookup_ingestion_job"
         ),
     )

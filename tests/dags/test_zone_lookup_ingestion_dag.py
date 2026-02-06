@@ -22,7 +22,7 @@ class TestZoneLookupIngestionDag:
     def test_dag_description(self, dag):
         """Test DAG has correct description."""
         assert (
-            dag.description == "Ingest taxi zone lookup reference data to Bronze layer"
+            dag.description == "Ingest taxi zone lookup reference data to Misc layer"
         )
 
     def test_dag_schedule(self, dag):
@@ -39,7 +39,7 @@ class TestZoneLookupIngestionDag:
 
     def test_dag_tags(self, dag):
         """Test DAG has correct tags."""
-        assert set(dag.tags) == {"bronze", "ingestion", "zone_lookup"}
+        assert set(dag.tags) == {"misc", "ingestion", "zone_lookup"}
 
     def test_dag_default_args_owner(self, dag):
         """Test default args owner."""
@@ -79,7 +79,7 @@ class TestZoneLookupIngestionDag:
     def test_ingest_task_bash_command_contains_module(self, dag):
         """Test bash command references correct module."""
         task = dag.get_task("ingest_zone_lookup")
-        assert "etl.jobs.bronze.zone_lookup_ingestion_job" in task.bash_command
+        assert "etl.jobs.misc.zone_lookup_ingestion_job" in task.bash_command
 
     def test_ingest_task_bash_command_no_params(self, dag):
         """Test bash command has no parameter placeholders."""

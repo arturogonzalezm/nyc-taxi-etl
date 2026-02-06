@@ -1,4 +1,4 @@
-.PHONY: up down logs nuke init help postgres-start postgres-stop postgres-create-tables postgres-shell postgres-status postgres-nuke
+.PHONY: up down logs nuke init check setup help postgres-start postgres-stop postgres-create-tables postgres-shell postgres-status postgres-nuke
 # Colors for terminal output
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
@@ -16,7 +16,79 @@ init:
 		echo "$(YELLOW).env file already exists, skipping...$(NC)"; \
 	fi
 	@echo "$(GREEN)Initialization complete!$(NC)"
-up: init
+check: init
+	@echo "$(CYAN)Running pre-flight checks...$(NC)"
+	@ERRORS=0; \
+	if ! docker info > /dev/null 2>&1; then \
+		echo "$(YELLOW)  [FAIL] Docker is not running. Start Docker Desktop and try again.$(NC)"; \
+		ERRORS=1; \
+	else \
+		echo "  [OK] Docker is running"; \
+	fi; \
+	if [ ! -f .env ]; then \
+		echo "$(YELLOW)  [FAIL] .env file not found. Run 'make init' first.$(NC)"; \
+		ERRORS=1; \
+	else \
+		echo "  [OK] .env file exists"; \
+		if grep -q "POSTGRES_PASSWORD=xxxx" .env 2>/dev/null; then \
+			echo "$(YELLOW)  [FAIL] POSTGRES_PASSWORD is still a placeholder in .env. Update it.$(NC)"; \
+			ERRORS=1; \
+		fi; \
+		if grep -q "AIRFLOW_ADMIN_PASSWORD=xxxxx" .env 2>/dev/null; then \
+			echo "$(YELLOW)  [FAIL] AIRFLOW_ADMIN_PASSWORD is still a placeholder in .env. Update it.$(NC)"; \
+			ERRORS=1; \
+		fi; \
+	fi; \
+	GCP_CREDS="$$HOME/.config/gcloud/application_default_credentials.json"; \
+	if [ ! -f "$$GCP_CREDS" ]; then \
+		echo "$(YELLOW)  [FAIL] GCP credentials not found at $$GCP_CREDS$(NC)"; \
+		echo "$(YELLOW)         Run 'make setup' to authenticate with GCP.$(NC)"; \
+		ERRORS=1; \
+	else \
+		echo "  [OK] GCP credentials found"; \
+	fi; \
+	if lsof -i :8080 > /dev/null 2>&1; then \
+		echo "$(YELLOW)  [WARN] Port 8080 is in use. Airflow may fail to start.$(NC)"; \
+	fi; \
+	if lsof -i :5432 > /dev/null 2>&1; then \
+		echo "$(YELLOW)  [WARN] Port 5432 is in use. PostgreSQL may fail to start.$(NC)"; \
+	fi; \
+	if [ $$ERRORS -ne 0 ]; then \
+		echo ""; \
+		echo "$(YELLOW)Pre-flight checks failed. Fix the issues above and try again.$(NC)"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)All pre-flight checks passed!$(NC)"
+setup:
+	@echo "$(CYAN)Setting up GCP authentication...$(NC)"
+	@RESOURCE_TYPE=$$(grep 'resource_type' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	REGION=$$(grep 'region' terraform/config.tfvars | head -1 | sed 's/.*= *"//;s/"//'); \
+	PROJECT_ID_BASE=$$(grep 'project_id_base' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	ENVIRONMENT=$$(grep 'environment' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	INSTANCE_NUMBER=$$(grep 'instance_number' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	PROJECT_ID="$${PROJECT_ID_BASE}-$${ENVIRONMENT}-$${INSTANCE_NUMBER}"; \
+	BUCKET="$${PROJECT_ID_BASE}-$${ENVIRONMENT}-$${RESOURCE_TYPE}-$${REGION}-$${INSTANCE_NUMBER}"; \
+	echo ""; \
+	echo "  Project ID: $${PROJECT_ID}"; \
+	echo "  Bucket:     gs://$${BUCKET}"; \
+	echo "  Auth:       Application Default Credentials (user)"; \
+	echo ""; \
+	echo "$(YELLOW)Step 1: Generating Application Default Credentials...$(NC)"; \
+	gcloud auth application-default login; \
+	echo ""; \
+	echo "$(YELLOW)Step 2: Granting bucket access to your account...$(NC)"; \
+	gcloud storage buckets add-iam-policy-binding \
+		"gs://$${BUCKET}" \
+		--member="user:$$(gcloud config get account 2>/dev/null)" \
+		--role="roles/storage.objectAdmin" \
+		--project="$${PROJECT_ID}" || { echo "$(YELLOW)Warning: Could not grant bucket access. You may need to do this manually.$(NC)"; }; \
+	echo ""; \
+	if [ -f "$$HOME/.config/gcloud/application_default_credentials.json" ]; then \
+		echo "$(GREEN)GCP authentication configured successfully!$(NC)"; \
+	else \
+		echo "$(YELLOW)Warning: Credentials file not found. Authentication may have failed.$(NC)"; \
+	fi
+up: init check
 	@echo "$(CYAN)Starting NYC Taxi ETL services...$(NC)"
 	@docker-compose up -d
 	@echo ""
@@ -146,6 +218,8 @@ help:
 	@echo ""
 	@echo "$(YELLOW)General:$(NC)"
 	@echo "  $(GREEN)make init$(NC)                     - Initialize directories and environment"
+	@echo "  $(GREEN)make setup$(NC)                    - Set up GCP authentication (ADC + bucket access)"
+	@echo "  $(GREEN)make check$(NC)                    - Run pre-flight checks (Docker, credentials, ports)"
 	@echo "  $(GREEN)make up$(NC)                       - Start all services (PostgreSQL + Airflow)"
 	@echo "  $(GREEN)make down$(NC)                     - Stop all services"
 	@echo "  $(GREEN)make logs$(NC)                     - Show service logs"

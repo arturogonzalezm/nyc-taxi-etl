@@ -88,9 +88,14 @@ class SparkSessionManager:
                 # Get GCP project ID with fallback to terraform.tfvars
                 gcs_project, _ = get_gcp_config_with_fallback()
                 gcs_keyfile = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+                impersonate_sa = os.getenv("GCS_IMPERSONATE_SA", "")
                 logger.info(f"Configuring Spark for GCS with project: {gcs_project}")
                 if gcs_keyfile:
-                    logger.info(f"Using service account keyfile: {gcs_keyfile}")
+                    logger.info(f"Using credentials file: {gcs_keyfile}")
+                if impersonate_sa:
+                    logger.info(
+                        f"Using GCS connector native impersonation: {impersonate_sa}"
+                    )
 
                 # Base Spark configuration with optimizations
                 builder = (
@@ -112,17 +117,14 @@ class SparkSessionManager:
                         "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS",
                     )
                     .config("spark.hadoop.fs.gs.project.id", gcs_project)
+                    # Auth: always use APPLICATION_DEFAULT (reads ADC JSON).
+                    # The GCS connector's native impersonation exchanges the
+                    # user's ADC token for short-lived SA credentials, avoiding
+                    # the "impersonated_service_account type not recognized"
+                    # error that older connectors throw when reading ADC files
+                    # generated with --impersonate-service-account.
                     .config(
-                        "spark.hadoop.fs.gs.auth.type",
-                        (
-                            "SERVICE_ACCOUNT_JSON_KEYFILE"
-                            if gcs_keyfile
-                            else "APPLICATION_DEFAULT"
-                        ),
-                    )
-                    .config(
-                        "spark.hadoop.google.cloud.auth.service.account.json.keyfile",
-                        gcs_keyfile,
+                        "spark.hadoop.fs.gs.auth.type", "APPLICATION_DEFAULT"
                     )
                     # GCS resilience settings - handle transient network issues
                     .config("spark.hadoop.fs.gs.http.connect-timeout", "120000")
@@ -137,6 +139,16 @@ class SparkSessionManager:
                         "org.postgresql:postgresql:42.7.1",
                     )
                 )
+
+                # If a service account is configured for impersonation,
+                # tell the GCS connector to impersonate it natively.
+                # This uses the caller's ADC token + TokenCreator IAM role
+                # to mint short-lived SA credentials for every GCS request.
+                if impersonate_sa:
+                    builder = builder.config(
+                        "spark.hadoop.fs.gs.auth.impersonation.service.account",
+                        impersonate_sa,
+                    )
 
                 cls._instance = builder.getOrCreate()
                 logger.info("SparkSession created successfully")

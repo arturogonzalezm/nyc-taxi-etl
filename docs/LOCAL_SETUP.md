@@ -156,7 +156,7 @@ python -m etl.jobs.bronze.taxi_ingestion_job --help
 
 ```bash
 # Ingest taxi zone lookup (required for dim_location)
-python -m etl.jobs.bronze.zone_lookup_ingestion_job
+python -m etl.jobs.misc.zone_lookup_ingestion_job
 ```
 
 #### Safe Backfill (Re-processing Historical Data)
@@ -216,7 +216,7 @@ Run the complete pipeline for January 2024 yellow taxi data:
 docker exec -it nyc-taxi-etl-etl bash
 
 # Step 1: Ingest zone lookup (one-time setup)
-python -m etl.jobs.bronze.zone_lookup_ingestion_job
+python -m etl.jobs.misc.zone_lookup_ingestion_job
 
 # Step 2: Ingest taxi trip data
 python -m etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --month 1
@@ -237,7 +237,7 @@ You can run jobs directly from the host using `docker-compose exec` or `docker e
 docker-compose exec etl python -m etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --start-year 2025 --start-month 1 --end-year 2025 --end-month 11
 
 # Zone lookup ingestion
-docker-compose exec etl python -m etl.jobs.bronze.zone_lookup_ingestion_job
+docker-compose exec etl python -m etl.jobs.misc.zone_lookup_ingestion_job
 
 # Gold transformation (date range)
 docker-compose exec etl python etl/jobs/gold/taxi_gold_job.py --taxi-type yellow --year 2025 --month 1 --end-year 2025 --end-month 11

@@ -2,73 +2,56 @@
 
 This document describes the recommended authentication methods for accessing Google Cloud Platform (GCP) resources in the NYC Taxi ETL pipeline.
 
-## Authentication Methods
+## Quick Start (Recommended)
 
-### 1. Workload Identity Federation with Service Account Impersonation (Recommended)
-
-Workload Identity Federation allows you to use your Google account to impersonate a service account, eliminating the need for service account key files. This is the most secure approach for local development.
-
-#### Prerequisites
-
-- Google Cloud SDK installed and configured
-- Access to the GCP project
-- Permission to impersonate the service account
-
-#### Setup Steps
-
-**Step 1: Grant Service Account Token Creator Role**
-
-First, grant yourself permission to impersonate the service account:
+After running `terraform apply`, set up authentication with a single command:
 
 ```bash
-gcloud iam service-accounts add-iam-policy-binding \
-  nyc-taxi-etl-dev-sa-001@nyc-taxi-etl-dev-001.iam.gserviceaccount.com \
-  --member="user:you@gmail.com" \
-  --role="roles/iam.serviceAccountTokenCreator" \
-  --project=nyc-taxi-etl-dev-001
+make setup
 ```
 
-> **Note:** Replace `you@gmail.com` with your actual Google account email.
-
-**Step 2: Authenticate with Impersonation**
-
-```bash
-gcloud auth application-default login \
-  --impersonate-service-account=nyc-taxi-etl-dev-sa-001@nyc-taxi-etl-dev-001.iam.gserviceaccount.com
-```
-
-This creates Application Default Credentials (ADC) that automatically impersonate the service account.
+This generates Application Default Credentials (ADC) and grants your user the Token Creator role on the Airflow service account. The Spark GCS connector then impersonates the SA natively at runtime, giving you least-privilege GCS-only access without key files. See [How It Works](#how-it-works) for details.
 
 ---
 
-### 2. Application Default Credentials (ADC)
+## How It Works
 
-For simpler setups or when service account impersonation is not required, you can use your own Google account credentials directly.
+The authentication uses **GCS connector native impersonation**:
 
-#### Setup Steps
+1. You authenticate as yourself via `gcloud auth application-default login` (produces an `authorized_user` ADC file)
+2. The `GCS_IMPERSONATE_SA` environment variable tells the Spark GCS connector which service account to impersonate
+3. At runtime, the GCS connector exchanges your ADC token for short-lived SA credentials via the IAM API
+4. All GCS requests use the SA's permissions (least-privilege, GCS bucket only)
 
-**Step 1: Authenticate**
+This avoids the `impersonated_service_account type not recognized` error that older GCS connectors throw when reading ADC files generated with `--impersonate-service-account`.
+
+> **Note:** The examples below use the default naming convention from `terraform/config.tfvars` (`instance_number = "003"`, `environment = "dev"`). If you changed these values, substitute accordingly. Run `terraform output airflow_service_account_email` to see your actual SA email.
+
+### Prerequisites
+
+- Google Cloud SDK installed and configured
+- Terraform infrastructure deployed (`terraform apply`)
+- `roles/iam.serviceAccountTokenCreator` on the Airflow SA (granted by `make setup`)
+
+### Manual Setup (if not using `make setup`)
+
+**Step 1: Grant Token Creator role**
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  nyc-taxi-etl-dev-airflow-003@nyc-taxi-etl-dev-003.iam.gserviceaccount.com \
+  --member="user:$(gcloud config get account)" \
+  --role="roles/iam.serviceAccountTokenCreator" \
+  --project=nyc-taxi-etl-dev-003
+```
+
+**Step 2: Generate ADC**
 
 ```bash
 gcloud auth application-default login
 ```
 
-This creates authorized_user credentials stored at:
-- **Linux/macOS:** `~/.config/gcloud/application_default_credentials.json`
-- **Windows:** `%APPDATA%\gcloud\application_default_credentials.json`
-
-**Step 2: Grant Bucket Access**
-
-Grant your user account direct access to the GCS bucket:
-
-```bash
-gcloud storage buckets add-iam-policy-binding \
-  gs://nyc-taxi-etl-dev-gcs-us-central1-001 \
-  --member="user:you@gmail.com" \
-  --role="roles/storage.objectAdmin"
-```
-
-> **Note:** Replace `you@gmail.com` with your actual Google account email.
+This creates `authorized_user` credentials at `~/.config/gcloud/application_default_credentials.json`, which Docker mounts into the containers. The `GCS_IMPERSONATE_SA` env var (set in `.env`) tells the GCS connector to impersonate the Airflow SA at runtime.
 
 ---
 
@@ -76,8 +59,8 @@ gcloud storage buckets add-iam-policy-binding \
 
 | Method | Security | Use Case | Key Management |
 |--------|----------|----------|----------------|
+| **Service Account Impersonation** | High | Local development (recommended) | No keys required |
 | **Workload Identity Federation** | High | Production, CI/CD | No keys required |
-| **Service Account Impersonation** | High | Local development | No keys required |
 | **ADC (User Credentials)** | Medium | Quick local testing | No keys required |
 | **Service Account Key File** | Lower | Legacy systems | Manual key rotation |
 
@@ -99,33 +82,47 @@ gcloud auth list
 gcloud auth application-default print-access-token
 ```
 
-**2. Service Account Impersonation Fails**
+**2. `impersonated_service_account type not recognized`**
+
+This means the ADC file was generated with `--impersonate-service-account`. The GCS connector (hadoop3-2.2.x) cannot parse this credential type. Fix by regenerating plain ADC:
+
+```bash
+gcloud auth application-default login   # no --impersonate-service-account flag
+```
+
+The `GCS_IMPERSONATE_SA` env var handles impersonation at the connector level instead.
+
+**3. Service Account Impersonation Fails**
 
 Ensure you have the `roles/iam.serviceAccountTokenCreator` role:
 
 ```bash
-gcloud projects get-iam-policy nyc-taxi-etl-dev-001 \
+gcloud projects get-iam-policy nyc-taxi-etl-dev-003 \
   --flatten="bindings[].members" \
-  --filter="bindings.members:user:you@gmail.com"
+  --filter="bindings.members:user:$(gcloud config get account)"
 ```
 
-**3. Bucket Access Denied**
+**4. Bucket Access Denied**
 
-Verify bucket permissions:
+Verify the Airflow SA has bucket access (Terraform should have granted this):
 
 ```bash
-gcloud storage buckets get-iam-policy gs://nyc-taxi-etl-dev-gcs-us-central1-001
+gcloud storage buckets get-iam-policy gs://nyc-taxi-etl-dev-gcs-us-central1-003
 ```
+
+**5. Slow GCS Reads or Timeouts**
+
+If you experience slow reads or `SocketTimeoutException` during Spark jobs, check that `GCS_IMPERSONATE_SA` is set in your `.env` — without it, requests use your user ADC directly which has lower API quotas.
 
 ---
 
 ## Security Best Practices
 
-1. **Prefer Workload Identity Federation** over service account keys
-2. **Use service account impersonation** for local development
+1. **Use GCS connector native impersonation** for local development (`make setup`)
+2. **Use Workload Identity Federation** for CI/CD (configured automatically via Terraform)
 3. **Never commit credentials** to version control
-4. **Rotate service account keys** regularly if you must use them
-5. **Use least-privilege IAM roles** - grant only necessary permissions
+4. **Avoid service account key files** - use impersonation instead
+5. **Use least-privilege IAM roles** - the Airflow SA only has GCS bucket access
 6. **Enable audit logging** to track credential usage
 
 ---

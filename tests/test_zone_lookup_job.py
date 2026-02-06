@@ -5,7 +5,7 @@ Tests for ZoneLookupIngestionJob to improve coverage.
 import pytest
 from unittest.mock import patch, MagicMock
 
-from etl.jobs.bronze.zone_lookup_ingestion_job import (
+from etl.jobs.misc.zone_lookup_ingestion_job import (
     ZoneLookupIngestionJob,
     ReferenceDataError,
     run_zone_lookup_ingestion,
@@ -300,7 +300,7 @@ class TestZoneLookupIngestionJobLoad:
         """Reset JobConfig singleton after each test."""
         JobConfig.reset()
 
-    @patch("etl.jobs.bronze.zone_lookup_ingestion_job.gcs_storage")
+    @patch("etl.jobs.misc.zone_lookup_ingestion_job.gcs_storage")
     def test_load_uploads_to_gcs(self, mock_gcs_storage, tmp_path):
         """Test load uploads CSV to GCS."""
         job = ZoneLookupIngestionJob()
@@ -325,7 +325,7 @@ class TestZoneLookupIngestionJobLoad:
         # Verify blob upload_from_filename was called
         mock_blob.upload_from_filename.assert_called_once()
 
-    @patch("etl.jobs.bronze.zone_lookup_ingestion_job.gcs_storage")
+    @patch("etl.jobs.misc.zone_lookup_ingestion_job.gcs_storage")
     def test_load_uses_correct_gcs_path(self, mock_gcs_storage, tmp_path):
         """Test load uses correct GCS object path."""
         job = ZoneLookupIngestionJob()

@@ -13,8 +13,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     openjdk-21-jre-headless \
     curl
 
-# Set Java environment
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+# Set Java environment (portable across arm64 and amd64)
+RUN ln -s /usr/lib/jvm/java-21-openjdk-* /usr/lib/jvm/java-21-openjdk
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Copy Spark jars, bin, and PySpark from official image (avoids 300+ second pip install)
@@ -33,11 +34,12 @@ WORKDIR /app
 # Install remaining Python dependencies (small packages, fast install)
 COPY pyproject.toml .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install delta-spark==4.0.1 psycopg2-binary>=2.9.9 requests python-dateutil google-cloud-storage
+    pip install --retries 3 --timeout 120 \
+    delta-spark==4.0.1 psycopg2-binary>=2.9.9 requests python-dateutil google-cloud-storage
 
-# Download GCS connector for Spark
-RUN curl -L -o /opt/spark/jars/gcs-connector-hadoop3-latest.jar \
-    https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-latest.jar
+# Download GCS connector for Spark (pinned version for reproducibility)
+RUN curl -L --retry 3 --retry-delay 5 -o /opt/spark/jars/gcs-connector-hadoop3-2.2.25.jar \
+    https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.25.jar
 
 # Copy project files
 COPY etl/ ./etl/

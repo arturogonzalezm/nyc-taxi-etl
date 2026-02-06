@@ -61,6 +61,8 @@ echo "# Computed values" >> "$ENV_FILE"
 echo "ENVIRONMENT=$ENVIRONMENT" >> "$ENV_FILE"
 echo "GCP_PROJECT_ID=$GCP_PROJECT_ID" >> "$ENV_FILE"
 echo "GCS_BUCKET=$GCS_BUCKET" >> "$ENV_FILE"
+GCS_IMPERSONATE_SA="${PROJECT_ID_BASE}-${ENVIRONMENT}-airflow-${INSTANCE_NUMBER}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+echo "GCS_IMPERSONATE_SA=$GCS_IMPERSONATE_SA" >> "$ENV_FILE"
 
 # Default Postgres values
 echo "" >> "$ENV_FILE"

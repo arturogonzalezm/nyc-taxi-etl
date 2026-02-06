@@ -17,12 +17,12 @@ x-airflow-common: &airflow-common
     POSTGRES_DB: ${POSTGRES_DB}
     GCS_BUCKET: ${GCS_BUCKET}
     GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+    GCS_IMPERSONATE_SA: ${GCS_IMPERSONATE_SA:-}
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-credentials.json
     CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /opt/airflow/gcp-credentials.json
   volumes:
     - ./dags:/opt/airflow/dags
     - ${HOME}/.config/gcloud/application_default_credentials.json:/opt/airflow/gcp-credentials.json:ro
-    - ./test_dags:/opt/airflow/test_dags
     - ./etl:/opt/airflow/etl
     - airflow_logs:/opt/airflow/logs
     - /var/run/docker.sock:/var/run/docker.sock
@@ -60,6 +60,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       GCS_BUCKET: ${GCS_BUCKET}
       GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      GCS_IMPERSONATE_SA: ${GCS_IMPERSONATE_SA:-}
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
     depends_on:
       postgres:

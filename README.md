@@ -102,29 +102,51 @@ See [terraform/README.md](terraform/README.md) for detailed infrastructure docum
 git clone https://github.com/arturogonzalezm/nyc-taxi-etl
 cd nyc-taxi-etl
 
+# For dev env and run locally switch to develop/gcp-organisation branch
+git checkout develop/gcp-organisation
+
+# For prod env and run in GCP switch to main branch
+git checkout main
+
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install ".[dev]"
-
-# Initialize environment
-make init
 ```
 
-### 2. Start Services
+### 2. GCP Infrastructure
 
 ```bash
-# Start PostgreSQL
+# Generate .env and terraform.tfvars from config
+./scripts/generate-env.sh
+
+# Provision GCP project, service accounts, and GCS bucket
+cd terraform
+terraform init
+terraform apply
+cd ..
+```
+
+### 3. Authenticate and Start
+
+```bash
+# Set up GCP authentication (service account impersonation)
+make setup
+
+# Start all services (PostgreSQL + Airflow)
 make up
 ```
 
 Services available:
 
+- Airflow UI: [http://localhost:8080](http://localhost:8080) (admin/admin)
 - PostgreSQL: localhost:5432
 
-### 3. Run the Pipeline
+### 4. Run the Pipeline
+
+Trigger DAGs from the Airflow UI, or run manually:
 
 ```bash
 # Ingest a single month of yellow taxi data
@@ -137,7 +159,7 @@ python -m etl.jobs.gold.taxi_gold_job --taxi-type yellow --year 2024 --month 1
 python -m etl.jobs.load.postgres_load_job --taxi-type yellow --year 2024 --month 1
 ```
 
-### 4. Query the Data
+### 5. Query the Data
 
 ```bash
 # Connect to PostgreSQL
@@ -148,7 +170,7 @@ SELECT COUNT(*) FROM taxi.fact_trip;
 SELECT * FROM taxi.dim_location LIMIT 10;
 ```
 
-### 5. Stop Services
+### 6. Stop Services
 
 ```bash
 make down
@@ -185,7 +207,7 @@ python -m etl.jobs.bronze.taxi_ingestion_job \
 Ingests the taxi zone lookup CSV for location dimension.
 
 ```bash
-python -m etl.jobs.bronze.zone_lookup_ingestion_job
+python -m etl.jobs.misc.zone_lookup_ingestion_job
 ```
 
 ### Gold Layer (Transformation)
@@ -274,7 +296,8 @@ nyc-taxi-etl/
 │   │   ├── base_job.py              # Abstract base class (Template Method pattern)
 │   │   ├── bronze/
 │   │   │   ├── taxi_ingestion_job.py           # NYC taxi data ingestion
-│   │   │   ├── taxi_injection_safe_backfill_job.py  # Safe historical backfill
+│   │   │   └── taxi_injection_safe_backfill_job.py  # Safe historical backfill
+│   │   ├── misc/
 │   │   │   └── zone_lookup_ingestion_job.py    # Zone lookup reference data
 │   │   ├── gold/
 │   │   │   └── taxi_gold_job.py     # Dimensional model transformation
