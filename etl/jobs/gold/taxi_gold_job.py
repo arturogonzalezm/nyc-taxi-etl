@@ -642,10 +642,16 @@ class TaxiGoldJob(BaseSparkJob):
             self.logger.info(
                 f"  Out-of-range dates: {quality_metrics['out_of_range']:,} (filtered to {start_date} - {end_date})"
             )
-            self.logger.info(f"  Null timestamps: {quality_metrics['null_timestamps']:,}")
+            self.logger.info(
+                f"  Null timestamps: {quality_metrics['null_timestamps']:,}"
+            )
             self.logger.info(f"  Invalid fares: {quality_metrics['invalid_fare']:,}")
-            self.logger.info(f"  Invalid distances: {quality_metrics['invalid_distance']:,}")
-            self.logger.info(f"  Invalid durations: {quality_metrics['invalid_duration']:,}")
+            self.logger.info(
+                f"  Invalid distances: {quality_metrics['invalid_distance']:,}"
+            )
+            self.logger.info(
+                f"  Invalid durations: {quality_metrics['invalid_duration']:,}"
+            )
             self.logger.info(
                 f"  Total invalid records: {total_invalid:,} ({100 * total_invalid / initial_count:.2f}%)"
             )
@@ -1030,9 +1036,9 @@ class TaxiGoldJob(BaseSparkJob):
             F.sum(F.when(F.col("fact_hash").isNull(), 1).otherwise(0)).alias(
                 "null_hashes"
             ),
-            F.sum(
-                F.when(F.length(F.col("fact_hash")) != 64, 1).otherwise(0)
-            ).alias("invalid_length_hashes"),
+            F.sum(F.when(F.length(F.col("fact_hash")) != 64, 1).otherwise(0)).alias(
+                "invalid_length_hashes"
+            ),
             F.countDistinct("fact_hash").alias("unique_hashes"),
             # Also compute statistics in the same pass
             F.avg("trip_distance").alias("avg_distance"),
@@ -1081,15 +1087,11 @@ class TaxiGoldJob(BaseSparkJob):
         self.logger.info(
             f"  avg_distance: {validation_metrics['avg_distance']:.2f} miles"
         )
-        self.logger.info(
-            f"  avg_fare: ${validation_metrics['avg_fare']:.2f}"
-        )
+        self.logger.info(f"  avg_fare: ${validation_metrics['avg_fare']:.2f}")
         self.logger.info(
             f"  avg_duration: {validation_metrics['avg_duration_min']:.2f} minutes"
         )
-        self.logger.info(
-            f"  avg_tip_pct: {validation_metrics['avg_tip_pct']:.2f}%"
-        )
+        self.logger.info(f"  avg_tip_pct: {validation_metrics['avg_tip_pct']:.2f}%")
 
         return fact_trip
 

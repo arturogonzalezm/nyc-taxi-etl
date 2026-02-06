@@ -128,7 +128,9 @@ class SparkSessionManager:
                     .config("spark.hadoop.fs.gs.http.connect-timeout", "120000")
                     .config("spark.hadoop.fs.gs.http.read-timeout", "120000")
                     .config("spark.hadoop.fs.gs.http.max.retry", "15")
-                    .config("spark.hadoop.fs.gs.max.wait.for.empty.object.creation", "60000")
+                    .config(
+                        "spark.hadoop.fs.gs.max.wait.for.empty.object.creation", "60000"
+                    )
                     .config(
                         "spark.jars.packages",
                         "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.18,"
