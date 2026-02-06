@@ -2,6 +2,7 @@
 # PRODUCTION ENVIRONMENT - TERRAFORM CONFIGURATION
 # =============================================================================
 # This module creates production infrastructure for NYC Taxi ETL pipeline:
+# - GCP Project (created within Organization)
 # - Cloud Composer (managed Airflow) for DAG orchestration
 # - Cloud Run for ETL job execution
 # - BigQuery dataset and tables for data warehouse
@@ -9,49 +10,112 @@
 # =============================================================================
 
 # =============================================================================
+# GCP PROJECT (created within Organization - fully automated)
+# =============================================================================
+
+resource "google_project" "prod_project" {
+  name            = "${var.project_name} - ${var.environment}"
+  project_id      = var.project_id
+  org_id          = var.organisation_id
+  billing_account = var.billing_account_id
+
+  auto_create_network = false
+
+  labels = local.common_labels
+}
+
+# =============================================================================
+# ENABLE FOUNDATIONAL APIS (required before any other resources)
+# =============================================================================
+
+resource "google_project_service" "cloudresourcemanager" {
+  project            = google_project.prod_project.project_id
+  service            = "cloudresourcemanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "iam" {
+  project            = google_project.prod_project.project_id
+  service            = "iam.googleapis.com"
+  disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
+}
+
+resource "google_project_service" "serviceusage" {
+  project            = google_project.prod_project.project_id
+  service            = "serviceusage.googleapis.com"
+  disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
+}
+
+resource "google_project_service" "storage" {
+  project            = google_project.prod_project.project_id
+  service            = "storage.googleapis.com"
+  disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
+}
+
+# =============================================================================
 # ENABLE REQUIRED APIS
 # =============================================================================
 
 resource "google_project_service" "composer" {
-  project            = var.project_id
+  project            = google_project.prod_project.project_id
   service            = "composer.googleapis.com"
   disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "cloudrun" {
-  project            = var.project_id
+  project            = google_project.prod_project.project_id
   service            = "run.googleapis.com"
   disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "bigquery" {
-  project            = var.project_id
+  project            = google_project.prod_project.project_id
   service            = "bigquery.googleapis.com"
   disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "artifactregistry" {
-  project            = var.project_id
+  project            = google_project.prod_project.project_id
   service            = "artifactregistry.googleapis.com"
   disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "cloudbuild" {
-  project            = var.project_id
+  project            = google_project.prod_project.project_id
   service            = "cloudbuild.googleapis.com"
   disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "vpcaccess" {
-  project            = var.project_id
+  project            = google_project.prod_project.project_id
   service            = "vpcaccess.googleapis.com"
   disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 resource "google_project_service" "compute" {
-  project            = var.project_id
+  project            = google_project.prod_project.project_id
   service            = "compute.googleapis.com"
   disable_on_destroy = false
+
+  depends_on = [google_project_service.cloudresourcemanager]
 }
 
 # =============================================================================
@@ -62,8 +126,8 @@ resource "google_project_service" "compute" {
 
 # VPC Network
 resource "google_compute_network" "etl_vpc" {
-  name                    = "${var.project_id_base}-${var.environment}-etl-vpc"
-  project                 = var.project_id
+  name                    = "${google_project.prod_project.project_id_base}-${var.environment}-etl-vpc"
+  project                 = google_project.prod_project.project_id
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
 
@@ -72,8 +136,8 @@ resource "google_compute_network" "etl_vpc" {
 
 # Subnet for Cloud Run VPC Connector
 resource "google_compute_subnetwork" "etl_subnet" {
-  name          = "${var.project_id_base}-${var.environment}-etl-subnet"
-  project       = var.project_id
+  name          = "${google_project.prod_project.project_id_base}-${var.environment}-etl-subnet"
+  project       = google_project.prod_project.project_id
   region        = var.region
   network       = google_compute_network.etl_vpc.id
   ip_cidr_range = "10.8.0.0/28" # /28 is minimum for VPC connector
@@ -83,8 +147,8 @@ resource "google_compute_subnetwork" "etl_subnet" {
 
 # Cloud Router for NAT
 resource "google_compute_router" "etl_router" {
-  name    = "${var.project_id_base}-${var.environment}-etl-router"
-  project = var.project_id
+  name    = "${google_project.prod_project.project_id_base}-${var.environment}-etl-router"
+  project = google_project.prod_project.project_id
   region  = var.region
   network = google_compute_network.etl_vpc.id
 }
@@ -92,8 +156,8 @@ resource "google_compute_router" "etl_router" {
 # Cloud NAT for outbound internet access
 # Required for Cloud Run to reach external URLs (NYC TLC CloudFront)
 resource "google_compute_router_nat" "etl_nat" {
-  name                               = "${var.project_id_base}-${var.environment}-etl-nat"
-  project                            = var.project_id
+  name                               = "${google_project.prod_project.project_id_base}-${var.environment}-etl-nat"
+  project                            = google_project.prod_project.project_id
   router                             = google_compute_router.etl_router.name
   region                             = var.region
   nat_ip_allocate_option             = "AUTO_ONLY"
@@ -107,8 +171,8 @@ resource "google_compute_router_nat" "etl_nat" {
 
 # VPC Connector for Cloud Run
 resource "google_vpc_access_connector" "etl_connector" {
-  name          = "${var.project_id_base}-${var.environment}-vpc-conn"
-  project       = var.project_id
+  name          = "${google_project.prod_project.project_id_base}-${var.environment}-vpc-conn"
+  project       = google_project.prod_project.project_id
   region        = var.region
   network       = google_compute_network.etl_vpc.id
   ip_cidr_range = "10.8.0.16/28" # Different range from subnet
@@ -124,8 +188,8 @@ resource "google_vpc_access_connector" "etl_connector" {
 
 # Firewall rule: Allow outbound HTTPS traffic to external URLs
 resource "google_compute_firewall" "allow_egress_https" {
-  name    = "${var.project_id_base}-${var.environment}-allow-egress-https"
-  project = var.project_id
+  name    = "${google_project.prod_project.project_id_base}-${var.environment}-allow-egress-https"
+  project = google_project.prod_project.project_id
   network = google_compute_network.etl_vpc.name
 
   direction = "EGRESS"
@@ -144,8 +208,8 @@ resource "google_compute_firewall" "allow_egress_https" {
 
 # Firewall rule: Allow internal communication within VPC
 resource "google_compute_firewall" "allow_internal" {
-  name    = "${var.project_id_base}-${var.environment}-allow-internal"
-  project = var.project_id
+  name    = "${google_project.prod_project.project_id_base}-${var.environment}-allow-internal"
+  project = google_project.prod_project.project_id
   network = google_compute_network.etl_vpc.name
 
   direction = "INGRESS"
@@ -179,7 +243,7 @@ resource "google_service_account" "composer_sa" {
   account_id   = local.composer_sa_name
   display_name = "Cloud Composer Service Account (${var.environment})"
   description  = "Service account for Cloud Composer to orchestrate ETL pipelines"
-  project      = var.project_id
+  project      = google_project.prod_project.project_id
 
   depends_on = [google_project_service.composer]
 }
@@ -189,7 +253,7 @@ resource "google_service_account" "cloud_run_sa" {
   account_id   = local.cloud_run_sa_name
   display_name = "Cloud Run Service Account (${var.environment})"
   description  = "Service account for Cloud Run to execute ETL jobs"
-  project      = var.project_id
+  project      = google_project.prod_project.project_id
 
   depends_on = [google_project_service.cloudrun]
 }
@@ -199,7 +263,7 @@ resource "google_service_account" "etl_sa" {
   account_id   = local.etl_sa_name
   display_name = "ETL Service Account (${var.environment})"
   description  = "Service account for ETL operations - BigQuery and GCS access"
-  project      = var.project_id
+  project      = google_project.prod_project.project_id
 }
 
 # =============================================================================
@@ -209,7 +273,7 @@ resource "google_service_account" "etl_sa" {
 resource "google_storage_bucket" "prod_data" {
   name          = local.gcs_bucket_name
   location      = var.region
-  project       = var.project_id
+  project       = google_project.prod_project.project_id
   force_destroy = false # Protect production data
 
   uniform_bucket_level_access = true
@@ -250,7 +314,7 @@ resource "google_bigquery_dataset" "taxi" {
   friendly_name = "NYC Taxi Data Warehouse"
   description   = "Production data warehouse for NYC Taxi ETL pipeline - dimensional model"
   location      = var.region
-  project       = var.project_id
+  project       = google_project.prod_project.project_id
 
   labels = local.common_labels
 
@@ -279,7 +343,7 @@ resource "google_bigquery_dataset" "taxi" {
 resource "google_composer_environment" "prod" {
   name    = local.composer_name
   region  = var.region
-  project = var.project_id
+  project = google_project.prod_project.project_id
 
   config {
     software_config {
@@ -294,7 +358,7 @@ resource "google_composer_environment" "prod" {
       env_variables = {
         ENVIRONMENT      = var.environment
         GCS_BUCKET       = local.gcs_bucket_name
-        GCP_PROJECT_ID   = var.project_id
+        GCP_PROJECT_ID   = google_project.prod_project.project_id
         BIGQUERY_DATASET = local.bigquery_dataset
         CLOUD_RUN_URL    = google_cloud_run_v2_service.etl_runner.uri
       }
@@ -351,7 +415,7 @@ resource "google_composer_environment" "prod" {
 resource "google_cloud_run_v2_service" "etl_runner" {
   name     = local.cloud_run_name
   location = var.region
-  project  = var.project_id
+  project  = google_project.prod_project.project_id
 
   template {
     service_account = google_service_account.cloud_run_sa.email
@@ -382,7 +446,7 @@ resource "google_cloud_run_v2_service" "etl_runner" {
       }
       env {
         name  = "GCP_PROJECT_ID"
-        value = var.project_id
+        value = google_project.prod_project.project_id
       }
       env {
         name  = "BIGQUERY_DATASET"
@@ -417,10 +481,10 @@ resource "google_cloud_run_v2_service" "etl_runner" {
 
 resource "google_artifact_registry_repository" "etl_images" {
   location      = var.region
-  repository_id = "${var.project_id_base}-${var.environment}-etl-images"
+  repository_id = "${google_project.prod_project.project_id_base}-${var.environment}-etl-images"
   description   = "Container images for ETL jobs"
   format        = "DOCKER"
-  project       = var.project_id
+  project       = google_project.prod_project.project_id
 
   labels = local.common_labels
 
@@ -433,7 +497,7 @@ resource "google_artifact_registry_repository" "etl_images" {
 
 # Composer Worker role (required for Composer)
 resource "google_project_iam_member" "composer_worker" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/composer.worker"
   member  = "serviceAccount:${google_service_account.composer_sa.email}"
 }
@@ -453,7 +517,7 @@ resource "google_storage_bucket_iam_member" "composer_gcs_bucket_reader" {
 
 # Cloud Run invoker (to trigger ETL jobs)
 resource "google_cloud_run_v2_service_iam_member" "composer_invoke_cloudrun" {
-  project  = var.project_id
+  project  = google_project.prod_project.project_id
   location = var.region
   name     = google_cloud_run_v2_service.etl_runner.name
   role     = "roles/run.invoker"
@@ -462,7 +526,7 @@ resource "google_cloud_run_v2_service_iam_member" "composer_invoke_cloudrun" {
 
 # BigQuery read access (for monitoring/validation)
 resource "google_project_iam_member" "composer_bigquery_viewer" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/bigquery.dataViewer"
   member  = "serviceAccount:${google_service_account.composer_sa.email}"
 }
@@ -486,13 +550,13 @@ resource "google_storage_bucket_iam_member" "cloudrun_gcs_bucket_reader" {
 
 # BigQuery write access for Cloud Run (ETL jobs write to BigQuery)
 resource "google_project_iam_member" "cloudrun_bigquery_data_editor" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/bigquery.dataEditor"
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
 resource "google_project_iam_member" "cloudrun_bigquery_job_user" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
@@ -522,19 +586,19 @@ resource "google_storage_bucket_iam_member" "etl_gcs_bucket_writer" {
 
 # BigQuery full access for ETL operations
 resource "google_project_iam_member" "etl_bigquery_data_editor" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/bigquery.dataEditor"
   member  = "serviceAccount:${google_service_account.etl_sa.email}"
 }
 
 resource "google_project_iam_member" "etl_bigquery_job_user" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.etl_sa.email}"
 }
 
 resource "google_project_iam_member" "etl_bigquery_data_owner" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/bigquery.dataOwner"
   member  = "serviceAccount:${google_service_account.etl_sa.email}"
 }
@@ -564,7 +628,7 @@ resource "google_service_account_iam_member" "composer_act_as_cloudrun" {
 
 # Artifact Registry Admin - push container images (includes uploadArtifacts permission)
 resource "google_artifact_registry_repository_iam_member" "cicd_artifact_registry_admin" {
-  project    = var.project_id
+  project    = google_project.prod_project.project_id
   location   = var.region
   repository = google_artifact_registry_repository.etl_images.name
   role       = "roles/artifactregistry.repoAdmin"
@@ -573,7 +637,7 @@ resource "google_artifact_registry_repository_iam_member" "cicd_artifact_registr
 
 # Cloud Run Admin - deploy and update Cloud Run services
 resource "google_project_iam_member" "cicd_cloudrun_admin" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/run.admin"
   member  = "serviceAccount:${var.cicd_service_account}"
 }
@@ -587,7 +651,7 @@ resource "google_service_account_iam_member" "cicd_act_as_cloudrun" {
 
 # Storage Admin - upload DAGs to Composer bucket
 resource "google_project_iam_member" "cicd_storage_admin" {
-  project = var.project_id
+  project = google_project.prod_project.project_id
   role    = "roles/storage.admin"
   member  = "serviceAccount:${var.cicd_service_account}"
 }

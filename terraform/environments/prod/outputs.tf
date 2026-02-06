@@ -29,7 +29,7 @@ output "gcs_bucket" {
 
 output "artifact_registry_url" {
   description = "Artifact Registry URL for container images"
-  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.etl_images.repository_id}"
+  value       = "${var.region}-docker.pkg.dev/${google_project.prod_project.project_id}/${google_artifact_registry_repository.etl_images.repository_id}"
 }
 
 output "composer_service_account" {
