@@ -263,9 +263,15 @@ jobs:
             terraform import $TF_VARS google_project.nyc_taxi_project "$PROJECT_ID" 2>/dev/null || true
           fi
 
-          # Import service account
+          # Import service account (main CI/CD service account)
           if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
             terraform import $TF_VARS google_service_account.nyc_taxi_sa "projects/${PROJECT_ID}/serviceAccounts/${SA_EMAIL}" 2>/dev/null || true
+          fi
+
+          # Import Airflow service account
+          AIRFLOW_SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-airflow-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+          if gcloud iam service-accounts describe "$AIRFLOW_SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+            terraform import $TF_VARS google_service_account.airflow_sa "projects/${PROJECT_ID}/serviceAccounts/${AIRFLOW_SA_EMAIL}" 2>/dev/null || true
           fi
 
           # Import workload identity pool (requires project number, not project ID)
