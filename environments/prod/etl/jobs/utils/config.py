@@ -33,7 +33,7 @@ class GCSConfig:
 
     Configuration values are loaded with the following priority:
     1. Environment variables (GCP_PROJECT_ID, GCS_BUCKET)
-    2. Computed from terraform/terraform.tfvars
+    2. Computed from terraform/environments/prod/config.tfvars
     """
 
     bucket: str = field(default_factory=_get_bucket)
@@ -61,13 +61,13 @@ class GCSConfig:
         if not self.bucket:
             errors.append(
                 "GCS_BUCKET not configured. Set via environment variable or "
-                "ensure terraform/terraform.tfvars exists with required variables."
+                "ensure terraform/environments/prod/config.tfvars exists with required variables."
             )
 
         if not self.project_id:
             errors.append(
                 "GCP_PROJECT_ID not configured. Set via environment variable or "
-                "ensure terraform/terraform.tfvars exists with required variables."
+                "ensure terraform/environments/prod/config.tfvars exists with required variables."
             )
 
         if errors:

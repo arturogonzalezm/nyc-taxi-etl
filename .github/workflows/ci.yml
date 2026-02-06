@@ -6,11 +6,10 @@ on:
   push:
     branches: [main, develop, 'develop/*']
   pull_request:
-    branches: [main]
+    branches: [main, develop, 'develop/*']
 
 env:
   TF_VERSION: '1.5.0'
-  WORKING_DIR: './terraform'
 
 jobs:
   # =============================================================================
@@ -65,16 +64,16 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Format Check (root)
-        working-directory: ${{ env.WORKING_DIR }}
-        run: terraform fmt -check -recursive
+      - name: Terraform Format Check (dev)
+        working-directory: ./terraform/environments/dev
+        run: terraform fmt -check
 
-      - name: Terraform Init (root)
-        working-directory: ${{ env.WORKING_DIR }}
+      - name: Terraform Init (dev)
+        working-directory: ./terraform/environments/dev
         run: terraform init -backend=false
 
-      - name: Terraform Validate (root)
-        working-directory: ${{ env.WORKING_DIR }}
+      - name: Terraform Validate (dev)
+        working-directory: ./terraform/environments/dev
         run: terraform validate
 
       - name: Terraform Format Check (prod)
@@ -200,6 +199,7 @@ jobs:
       id-token: write
     env:
       ENVIRONMENT: 'dev'
+      DEV_TF_DIR: './terraform/environments/dev'
 
     steps:
       - name: Checkout repository
@@ -217,7 +217,7 @@ jobs:
             value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
             # Export to GITHUB_ENV (uppercase key)
             echo "${key^^}=$value" >> $GITHUB_ENV
-          done < terraform/config.tfvars
+          done < terraform/environments/dev/config.tfvars
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -234,11 +234,11 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        working-directory: ${{ env.WORKING_DIR }}
+        working-directory: ${{ env.DEV_TF_DIR }}
         run: terraform init
 
       - name: Import existing resources if needed
-        working-directory: ${{ env.WORKING_DIR }}
+        working-directory: ${{ env.DEV_TF_DIR }}
         run: |
           PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
           SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -279,7 +279,7 @@ jobs:
           fi
 
       - name: Terraform Plan
-        working-directory: ${{ env.WORKING_DIR }}
+        working-directory: ${{ env.DEV_TF_DIR }}
         run: |
           terraform plan \
             -var-file=config.tfvars \
@@ -290,7 +290,7 @@ jobs:
             -out=tfplan
 
       - name: Terraform Apply
-        working-directory: ${{ env.WORKING_DIR }}
+        working-directory: ${{ env.DEV_TF_DIR }}
         id: apply-dev
         continue-on-error: true
         run: |
@@ -394,13 +394,13 @@ jobs:
       - name: Load config from terraform.tfvars
         id: config
         run: |
-          # Parse root terraform.tfvars for base configuration
+          # Parse prod terraform.tfvars for base configuration
           while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
             key=$(echo "$key" | xargs)
             value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
             echo "${key^^}=$value" >> $GITHUB_ENV
-          done < terraform/config.tfvars
+          done < terraform/environments/prod/config.tfvars
           
           # Set production-specific variables
           echo "PROD_PROJECT_ID=${PROJECT_ID_BASE}-prod-${REGION}-${INSTANCE_NUMBER}" >> $GITHUB_ENV
