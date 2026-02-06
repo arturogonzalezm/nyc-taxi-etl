@@ -18,7 +18,11 @@ Tests cover:
 import pytest
 from unittest.mock import patch, MagicMock
 
-from environments.dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob, DataQualityError, run_gold_job
+from environments.dev.etl.jobs.gold.taxi_gold_job import (
+    TaxiGoldJob,
+    DataQualityError,
+    run_gold_job,
+)
 from environments.dev.etl.jobs.base_job import JobExecutionError
 from environments.dev import JobConfig
 
@@ -703,7 +707,9 @@ class TestRunGoldJobFunctionExtended:
 
     def test_run_gold_job_creates_job_instance(self):
         """Test run_gold_job creates TaxiGoldJob instance."""
-        with patch("environments.dev.etl.jobs.gold.taxi_gold_job.TaxiGoldJob") as MockJob:
+        with patch(
+            "environments.dev.etl.jobs.gold.taxi_gold_job.TaxiGoldJob"
+        ) as MockJob:
             mock_instance = MagicMock()
             mock_instance.run.return_value = True
             MockJob.return_value = mock_instance
@@ -715,7 +721,9 @@ class TestRunGoldJobFunctionExtended:
 
     def test_run_gold_job_with_date_range(self):
         """Test run_gold_job with end date parameters."""
-        with patch("environments.dev.etl.jobs.gold.taxi_gold_job.TaxiGoldJob") as MockJob:
+        with patch(
+            "environments.dev.etl.jobs.gold.taxi_gold_job.TaxiGoldJob"
+        ) as MockJob:
             mock_instance = MagicMock()
             mock_instance.run.return_value = True
             MockJob.return_value = mock_instance
@@ -727,7 +735,9 @@ class TestRunGoldJobFunctionExtended:
 
     def test_run_gold_job_handles_exception(self):
         """Test run_gold_job propagates exceptions from job.run()."""
-        with patch("environments.dev.etl.jobs.gold.taxi_gold_job.TaxiGoldJob") as MockJob:
+        with patch(
+            "environments.dev.etl.jobs.gold.taxi_gold_job.TaxiGoldJob"
+        ) as MockJob:
             mock_instance = MagicMock()
             mock_instance.run.side_effect = JobExecutionError("Job failed")
             MockJob.return_value = mock_instance

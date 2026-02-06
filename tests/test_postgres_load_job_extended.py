@@ -13,7 +13,10 @@ Tests cover:
 import pytest
 from unittest.mock import patch, MagicMock
 
-from environments.dev.etl.jobs.load.postgres_load_job import PostgresLoadJob, run_postgres_load
+from environments.dev.etl.jobs.load.postgres_load_job import (
+    PostgresLoadJob,
+    run_postgres_load,
+)
 from environments.dev.etl.jobs.base_job import JobExecutionError
 from environments.dev import JobConfig
 
@@ -564,7 +567,9 @@ class TestPostgresLoadJobIntegration:
 
     def test_run_postgres_load_with_all_params(self):
         """Test run_postgres_load function with all parameters."""
-        with patch("environments.dev.etl.jobs.load.postgres_load_job.PostgresLoadJob") as MockJob:
+        with patch(
+            "environments.dev.etl.jobs.load.postgres_load_job.PostgresLoadJob"
+        ) as MockJob:
             mock_instance = MagicMock()
             mock_instance.run.return_value = True
             MockJob.return_value = mock_instance

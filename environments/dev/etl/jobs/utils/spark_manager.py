@@ -16,7 +16,9 @@ import logging
 from typing import Optional, Dict, Any
 from pyspark.sql import SparkSession
 
-from environments.dev.etl.jobs.utils.terraform_config import get_gcp_config_with_fallback
+from environments.dev.etl.jobs.utils.terraform_config import (
+    get_gcp_config_with_fallback,
+)
 
 logger = logging.getLogger(__name__)
 

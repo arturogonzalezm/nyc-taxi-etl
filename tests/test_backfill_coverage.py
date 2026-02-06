@@ -205,7 +205,9 @@ class TestSafeHistoricalBackfill:
 
     def test_safe_historical_backfill_processes_months(self):
         """Test safe_historical_backfill processes multiple months."""
-        with patch("environments.dev.etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+        with patch(
+            "environments.dev.etl.jobs.utils.spark_manager.SparkSessionManager"
+        ) as mock_sm:
             mock_spark = MagicMock()
             mock_sm.get_session.return_value = mock_spark
             with patch(
@@ -235,7 +237,9 @@ class TestSafeHistoricalBackfill:
 
     def test_safe_historical_backfill_empty_months(self):
         """Test safe_historical_backfill with empty months list."""
-        with patch("environments.dev.etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+        with patch(
+            "environments.dev.etl.jobs.utils.spark_manager.SparkSessionManager"
+        ) as mock_sm:
             mock_spark = MagicMock()
             mock_sm.get_session.return_value = mock_spark
 
@@ -245,7 +249,9 @@ class TestSafeHistoricalBackfill:
 
     def test_safe_historical_backfill_with_delete(self):
         """Test safe_historical_backfill with delete_existing=True."""
-        with patch("environments.dev.etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+        with patch(
+            "environments.dev.etl.jobs.utils.spark_manager.SparkSessionManager"
+        ) as mock_sm:
             mock_spark = MagicMock()
             mock_sm.get_session.return_value = mock_spark
             with patch(

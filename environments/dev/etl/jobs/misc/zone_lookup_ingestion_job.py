@@ -255,7 +255,7 @@ class ZoneLookupIngestionJob(BaseSparkJob):
 
 def run_zone_lookup_ingestion() -> bool:
     """
-    Convenience function to run the zone lookup bronze job.
+    Convenience function to run the zone lookup misc job.
     :returns bool: True if successful, False otherwise
     """
     job = ZoneLookupIngestionJob()

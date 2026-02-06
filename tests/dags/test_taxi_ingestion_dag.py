@@ -99,7 +99,9 @@ class TestTaxiIngestionDag:
     def test_ingest_task_bash_command_contains_module(self, dag):
         """Test bash command references correct module."""
         task = dag.get_task("ingest_taxi_data")
-        assert "environments.dev.etl.jobs.bronze.taxi_ingestion_job" in task.bash_command
+        assert (
+            "environments.dev.etl.jobs.bronze.taxi_ingestion_job" in task.bash_command
+        )
 
     def test_ingest_task_bash_command_contains_params(self, dag):
         """Test bash command contains all parameter placeholders."""

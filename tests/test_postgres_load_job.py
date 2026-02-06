@@ -12,7 +12,10 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
-from environments.dev.etl.jobs.load.postgres_load_job import PostgresLoadJob, run_postgres_load
+from environments.dev.etl.jobs.load.postgres_load_job import (
+    PostgresLoadJob,
+    run_postgres_load,
+)
 from environments.dev import JobConfig
 
 

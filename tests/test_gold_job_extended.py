@@ -5,7 +5,11 @@ Extended tests for TaxiGoldJob to improve coverage.
 import pytest
 from unittest.mock import patch, MagicMock
 
-from environments.dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob, DataQualityError, run_gold_job
+from environments.dev.etl.jobs.gold.taxi_gold_job import (
+    TaxiGoldJob,
+    DataQualityError,
+    run_gold_job,
+)
 from environments.dev.etl.jobs.base_job import BaseSparkJob, JobExecutionError
 from environments.dev import JobConfig
 
