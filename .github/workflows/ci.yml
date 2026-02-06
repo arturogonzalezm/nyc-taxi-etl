@@ -204,7 +204,7 @@ jobs:
     name: 6. Terraform Deploy Dev
     runs-on: ubuntu-latest
     needs: [integration-tests]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/develop/'))
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/develop')
     permissions:
       contents: read
       id-token: write
