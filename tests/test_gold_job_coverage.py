@@ -45,6 +45,7 @@ class TestTaxiGoldJobExtractBronzeTrips:
         mock_df.take.return_value = [MagicMock()]  # Non-empty partition
         mock_df.withColumn.return_value = mock_df
         mock_df.select.return_value = mock_df
+        mock_df.cache.return_value = mock_df
         mock_spark.read.option.return_value.option.return_value.parquet.return_value = (
             mock_df
         )
@@ -79,6 +80,7 @@ class TestTaxiGoldJobExtractBronzeTrips:
         mock_df.take.return_value = [MagicMock()]  # Non-empty partition
         mock_df.withColumn.return_value = mock_df
         mock_df.select.return_value = mock_df
+        mock_df.cache.return_value = mock_df
         mock_spark.read.option.return_value.option.return_value.parquet.return_value = (
             mock_df
         )
@@ -602,6 +604,14 @@ class TestTaxiGoldJobTransformMethod:
         mock_trips_df = MagicMock()
         mock_zones_df = MagicMock()
 
+        # Configure mocks to return integers for count() and support cache/unpersist
+        mock_trips_df.count.return_value = 1000
+        mock_trips_df.cache.return_value = mock_trips_df
+        mock_trips_df.unpersist.return_value = None
+        mock_zones_df.count.return_value = 265
+        mock_zones_df.cache.return_value = mock_zones_df
+        mock_zones_df.unpersist.return_value = None
+
         # Mock all internal methods
         with patch.object(job, "_remove_duplicates", return_value=mock_trips_df):
             with patch.object(
@@ -625,7 +635,6 @@ class TestTaxiGoldJobTransformMethod:
                                     return_value=MagicMock(),
                                 ):
                                     with patch.object(job, "_validate_hash_integrity"):
-                                        mock_trips_df.count.return_value = 1000
                                         result = job.transform(
                                             (mock_trips_df, mock_zones_df)
                                         )
@@ -641,7 +650,14 @@ class TestTaxiGoldJobTransformMethod:
 
         mock_trips_df = MagicMock()
         mock_zones_df = MagicMock()
+
+        # Configure mocks to return integers for count() and support cache/unpersist
         mock_trips_df.count.return_value = 500
+        mock_trips_df.cache.return_value = mock_trips_df
+        mock_trips_df.unpersist.return_value = None
+        mock_zones_df.count.return_value = 265
+        mock_zones_df.cache.return_value = mock_zones_df
+        mock_zones_df.unpersist.return_value = None
 
         with patch.object(
             job, "_remove_duplicates", return_value=mock_trips_df

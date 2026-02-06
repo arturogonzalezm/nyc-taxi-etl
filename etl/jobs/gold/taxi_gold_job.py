@@ -264,14 +264,13 @@ class TaxiGoldJob(BaseSparkJob):
                     self.logger.warning(f"Partition {year}-{month} is empty, skipping")
                     continue
 
-                # Now get full count for logging
-                partition_count = df_partition.count()
-
+                # Skip per-partition count() to avoid extra GCS read
+                # Total count will be computed once after union on a cached DataFrame
                 dfs.append(df_partition)
                 all_columns.update(df_partition.columns)
                 self.logger.info(
                     f"✓ Loaded partition: year={year}, month={month} "
-                    f"({partition_count:,} records, {len(df_partition.columns)} columns)"
+                    f"({len(df_partition.columns)} columns)"
                 )
             except Exception as e:
                 self.logger.error(
@@ -338,7 +337,10 @@ class TaxiGoldJob(BaseSparkJob):
         # Note: year/month are partition columns in the directory path, not data columns
         # We already filtered by reading specific partition paths above, so no additional filter needed
 
-        self.logger.info("Union complete, materializing count...")
+        # Cache the unioned DataFrame to avoid repeated GCS reads during
+        # transform (dedup, quality filtering, etc.)
+        self.logger.info("Union complete, caching and materializing count...")
+        trips_df = trips_df.cache()
         record_count = trips_df.count()
         self.logger.info(f"Extracted {record_count:,} trip records from bronze layer")
 
@@ -368,6 +370,11 @@ class TaxiGoldJob(BaseSparkJob):
         """
         Transform bronze data into dimensional model.
 
+        Performance optimizations:
+        - Caches intermediate DataFrames to avoid repeated GCS reads
+        - Uses proper cache/unpersist lifecycle management
+        - Single-pass operations where possible
+
         :params data: Tuple of (trips_df, zones_df)
         :returns: Dictionary with dimensional model tables:
                     {
@@ -381,40 +388,67 @@ class TaxiGoldJob(BaseSparkJob):
 
         self.logger.info("=== Starting Gold Layer Transformation ===")
 
-        # Remove duplicates from source data
-        initial_count = trips_df.count()
-        trips_df = self._remove_duplicates(trips_df)
-        deduped_count = trips_df.count()
-        if initial_count > deduped_count:
-            self.logger.warning(
-                f"Removed {initial_count - deduped_count:,} duplicate records "
-                f"({100 * (initial_count - deduped_count) / initial_count:.2f}%)"
+        # Cache zones_df as it's small and used multiple times
+        zones_df = zones_df.cache()
+        self.logger.info("Cached zone lookup data for reuse")
+
+        try:
+            # trips_df is already cached by _extract_bronze_trips
+            # Remove duplicates from source data
+            initial_count = trips_df.count()
+            trips_deduped = self._remove_duplicates(trips_df)
+            deduped_count = trips_deduped.count()
+
+            # Release raw bronze cache now that dedup is done
+            trips_df.unpersist()
+            self.logger.info("Released cached raw bronze trips")
+
+            if initial_count > deduped_count:
+                self.logger.warning(
+                    f"Removed {initial_count - deduped_count:,} duplicate records "
+                    f"({100 * (initial_count - deduped_count) / initial_count:.2f}%)"
+                )
+
+            # Data quality filtering (pass deduped_count to avoid redundant count())
+            trips_clean = self._apply_data_quality_filters(trips_deduped, deduped_count)
+
+            # Standardize column names (handle yellow/green differences)
+            trips_standardized = self._standardize_schema(trips_clean)
+
+            # Cache standardized trips as it's used for multiple dimension tables
+            trips_standardized = trips_standardized.cache()
+            standardized_count = trips_standardized.count()
+            self.logger.info(
+                f"Cached {standardized_count:,} standardized trip records for dimension creation"
             )
 
-        # Data quality filtering
-        trips_clean = self._apply_data_quality_filters(trips_df)
+            try:
+                # Create dimension tables
+                dim_date = self._create_dim_date(trips_standardized)
+                dim_location = self._create_dim_location(zones_df)
+                dim_payment = self._create_dim_payment(trips_standardized)
 
-        # Standardize column names (handle yellow/green differences)
-        trips_standardized = self._standardize_schema(trips_clean)
+                # Create fact table
+                fact_trip = self._create_fact_trip(
+                    trips_standardized, dim_date, dim_location, dim_payment
+                )
 
-        # Create dimension tables
-        dim_date = self._create_dim_date(trips_standardized)
-        dim_location = self._create_dim_location(zones_df)
-        dim_payment = self._create_dim_payment(trips_standardized)
+                self.logger.info("=== Gold Layer Transformation Complete ===")
 
-        # Create fact table
-        fact_trip = self._create_fact_trip(
-            trips_standardized, dim_date, dim_location, dim_payment
-        )
-
-        self.logger.info("=== Gold Layer Transformation Complete ===")
-
-        return {
-            "fact_trip": fact_trip,
-            "dim_date": dim_date,
-            "dim_location": dim_location,
-            "dim_payment": dim_payment,
-        }
+                return {
+                    "fact_trip": fact_trip,
+                    "dim_date": dim_date,
+                    "dim_location": dim_location,
+                    "dim_payment": dim_payment,
+                }
+            finally:
+                # Unpersist standardized trips after dimension creation
+                trips_standardized.unpersist()
+                self.logger.info("Released cached standardized trips")
+        finally:
+            # Unpersist zones_df
+            zones_df.unpersist()
+            self.logger.info("Released cached zone lookup data")
 
     def _remove_duplicates(self, df: DataFrame) -> DataFrame:
         """
@@ -433,10 +467,11 @@ class TaxiGoldJob(BaseSparkJob):
         - Bronze layer contains ALL records (audit trail)
         - Gold layer contains LATEST version only (business view)
 
+        Note: Caller (transform) is responsible for computing counts and logging
+        duplicate removal stats to avoid redundant count() calls.
+
         :returns: DataFrame with duplicates removed, keeping latest version
         """
-        initial_count = df.count()
-
         if "record_hash" in df.columns:
             # Hash-based deduplication with SCD Type 1 logic
             self.logger.info(
@@ -458,16 +493,6 @@ class TaxiGoldJob(BaseSparkJob):
                     .drop("row_num")
                 )
 
-                deduped_count = df_deduped.count()
-                removed_count = initial_count - deduped_count
-
-                if removed_count > 0:
-                    self.logger.info(
-                        f"SCD Type 1: Removed {removed_count:,} older versions, "
-                        f"kept {deduped_count:,} latest records "
-                        f"({100 * removed_count / initial_count:.2f}% were duplicates)"
-                    )
-
                 return df_deduped
             else:
                 # Simple hash deduplication (no timestamp available)
@@ -482,7 +507,9 @@ class TaxiGoldJob(BaseSparkJob):
             )
             return df.dropDuplicates()
 
-    def _apply_data_quality_filters(self, df: DataFrame) -> DataFrame:
+    def _apply_data_quality_filters(
+        self, df: DataFrame, initial_count: Optional[int] = None
+    ) -> DataFrame:
         """
         Apply comprehensive data quality filters.
 
@@ -494,13 +521,16 @@ class TaxiGoldJob(BaseSparkJob):
         - Invalid timestamps
         - Out-of-range dates (pickup_datetime outside requested date range)
 
+        :params df: Input DataFrame to filter
+        :params initial_count: Pre-computed record count (avoids redundant count() call)
         :returns: Cleaned DataFrame with data quality flags
         """
         from datetime import date
         from dateutil.relativedelta import relativedelta
 
         self.logger.info("Applying data quality filters...")
-        initial_count = df.count()
+        if initial_count is None:
+            initial_count = df.count()
 
         # Identify pickup/dropoff datetime columns (different names for yellow/green)
         pickup_col = (
@@ -577,41 +607,57 @@ class TaxiGoldJob(BaseSparkJob):
             ),
         )
 
-        # Log quality metrics by category
-        out_of_range_count = df_with_flags.filter(
-            F.col("has_out_of_range_date")
-        ).count()
-        null_timestamps_count = df_with_flags.filter(
-            F.col("has_null_timestamps")
-        ).count()
-        invalid_fare_count = df_with_flags.filter(F.col("has_invalid_fare")).count()
-        invalid_distance_count = df_with_flags.filter(
-            F.col("has_invalid_distance")
-        ).count()
-        invalid_duration_count = df_with_flags.filter(
-            F.col("has_invalid_duration")
-        ).count()
-        total_invalid = df_with_flags.filter(~F.col("is_valid_record")).count()
+        # Cache to avoid repeated GCS reads for quality metrics and filtering
+        df_with_flags = df_with_flags.cache()
 
-        self.logger.info("Data quality summary:")
-        self.logger.info(f"  Initial records: {initial_count:,}")
-        self.logger.info(
-            f"  Out-of-range dates: {out_of_range_count:,} (filtered to {start_date} - {end_date})"
-        )
-        self.logger.info(f"  Null timestamps: {null_timestamps_count:,}")
-        self.logger.info(f"  Invalid fares: {invalid_fare_count:,}")
-        self.logger.info(f"  Invalid distances: {invalid_distance_count:,}")
-        self.logger.info(f"  Invalid durations: {invalid_duration_count:,}")
-        self.logger.info(
-            f"  Total invalid records: {total_invalid:,} ({100 * total_invalid / initial_count:.2f}%)"
-        )
+        try:
+            # Single-pass aggregation for all quality metrics
+            # Avoids 6 separate filter().count() calls that each re-read from GCS
+            quality_metrics = df_with_flags.agg(
+                F.count("*").alias("total"),
+                F.sum(F.when(F.col("has_out_of_range_date"), 1).otherwise(0)).alias(
+                    "out_of_range"
+                ),
+                F.sum(F.when(F.col("has_null_timestamps"), 1).otherwise(0)).alias(
+                    "null_timestamps"
+                ),
+                F.sum(F.when(F.col("has_invalid_fare"), 1).otherwise(0)).alias(
+                    "invalid_fare"
+                ),
+                F.sum(F.when(F.col("has_invalid_distance"), 1).otherwise(0)).alias(
+                    "invalid_distance"
+                ),
+                F.sum(F.when(F.col("has_invalid_duration"), 1).otherwise(0)).alias(
+                    "invalid_duration"
+                ),
+                F.sum(F.when(~F.col("is_valid_record"), 1).otherwise(0)).alias(
+                    "total_invalid"
+                ),
+            ).collect()[0]
 
-        # Filter to valid records only
-        df_clean = df_with_flags.filter(F.col("is_valid_record"))
-        clean_count = df_clean.count()
-        self.logger.info(
-            f"  Clean records: {clean_count:,} ({100 * clean_count / initial_count:.2f}%)"
-        )
+            total_invalid = quality_metrics["total_invalid"] or 0
+
+            self.logger.info("Data quality summary:")
+            self.logger.info(f"  Initial records: {initial_count:,}")
+            self.logger.info(
+                f"  Out-of-range dates: {quality_metrics['out_of_range']:,} (filtered to {start_date} - {end_date})"
+            )
+            self.logger.info(f"  Null timestamps: {quality_metrics['null_timestamps']:,}")
+            self.logger.info(f"  Invalid fares: {quality_metrics['invalid_fare']:,}")
+            self.logger.info(f"  Invalid distances: {quality_metrics['invalid_distance']:,}")
+            self.logger.info(f"  Invalid durations: {quality_metrics['invalid_duration']:,}")
+            self.logger.info(
+                f"  Total invalid records: {total_invalid:,} ({100 * total_invalid / initial_count:.2f}%)"
+            )
+
+            # Filter to valid records only
+            df_clean = df_with_flags.filter(F.col("is_valid_record"))
+            clean_count = df_clean.count()
+            self.logger.info(
+                f"  Clean records: {clean_count:,} ({100 * clean_count / initial_count:.2f}%)"
+            )
+        finally:
+            df_with_flags.unpersist()
 
         return df_clean
 
@@ -943,73 +989,107 @@ class TaxiGoldJob(BaseSparkJob):
             ),
         )
 
-        fact_count = fact_trip.count()
-        self.logger.info(f"Created fact_trip: {fact_count:,} trip records")
+        # Cache fact_trip before materializing to avoid repeated GCS reads
+        # Both count() and _validate_hash_integrity will read from cache
+        fact_trip = fact_trip.cache()
 
-        # Validate hash integrity
-        self._validate_hash_integrity(fact_trip)
+        try:
+            fact_count = fact_trip.count()
+            self.logger.info(f"Created fact_trip: {fact_count:,} trip records")
+
+            # Validate hash integrity (reads from cache, no GCS re-read)
+            self._validate_hash_integrity(fact_trip)
+        finally:
+            fact_trip.unpersist()
+            self.logger.info("Released cached fact_trip")
 
         return fact_trip
 
     def _validate_hash_integrity(self, fact_trip: DataFrame):
         """
-        Validate data integrity using fact_hash.
+        Validate data integrity using fact_hash with optimized single-pass validation.
 
         Checks:
         1. fact_hash is not null
         2. fact_hash is unique (no accidental duplicates)
-        3. Hash distribution is reasonable (no hash collisions)
+        3. Hash length is valid (SHA-256 = 64 hex characters)
 
-        :params fact_trip: Fact table DataFrame with fact_hash
+        Performance optimization:
+        - Uses single aggregation query instead of multiple count() calls
+        - Expects caller to cache DataFrame before calling this method
+        - Combines all validation metrics in one pass
+
+        :params fact_trip: Fact table DataFrame with fact_hash (should be cached by caller)
         """
         self.logger.info("=== Validating Hash Integrity ===")
 
-        total_records = fact_trip.count()
+        # Single-pass aggregation for all validation metrics
+        # DataFrame should already be cached by _create_fact_trip
+        validation_metrics = fact_trip.agg(
+            F.count("*").alias("total_records"),
+            F.sum(F.when(F.col("fact_hash").isNull(), 1).otherwise(0)).alias(
+                "null_hashes"
+            ),
+            F.sum(
+                F.when(F.length(F.col("fact_hash")) != 64, 1).otherwise(0)
+            ).alias("invalid_length_hashes"),
+            F.countDistinct("fact_hash").alias("unique_hashes"),
+            # Also compute statistics in the same pass
+            F.avg("trip_distance").alias("avg_distance"),
+            F.avg("fare_amount").alias("avg_fare"),
+            F.avg("trip_duration_minutes").alias("avg_duration_min"),
+            F.avg("tip_percentage").alias("avg_tip_pct"),
+        ).collect()[0]
 
-        # Check No null hashes
-        null_hashes = fact_trip.filter(F.col("fact_hash").isNull()).count()
+        total_records = validation_metrics["total_records"]
+        null_hashes = validation_metrics["null_hashes"] or 0
+        invalid_length_hashes = validation_metrics["invalid_length_hashes"] or 0
+        unique_hashes = validation_metrics["unique_hashes"]
+
+        # Check for null hashes
         if null_hashes > 0:
             self.logger.error(f"Found {null_hashes:,} records with NULL fact_hash")
             raise JobExecutionError(
                 f"Data integrity error: {null_hashes} NULL hashes found"
             )
 
-        # Check Hash uniqueness
-        unique_hashes = fact_trip.select("fact_hash").distinct().count()
+        # Check hash length validity
+        if invalid_length_hashes > 0:
+            self.logger.error(
+                f"Found {invalid_length_hashes:,} hashes with invalid length (expected 64)"
+            )
+            raise JobExecutionError(
+                f"Data integrity error: {invalid_length_hashes} invalid hash lengths"
+            )
+
+        # Check hash uniqueness
         if unique_hashes != total_records:
             duplicate_count = total_records - unique_hashes
             self.logger.warning(
                 f"Hash uniqueness check: {unique_hashes:,} unique hashes for {total_records:,} records "
                 f"({duplicate_count:,} duplicates detected)"
             )
-            # This is acceptable - duplicates should have been filtered in deduplication step
         else:
             self.logger.info(
                 f"✓ Hash uniqueness verified: All {total_records:,} hashes are unique"
             )
 
-        # Check Hash length and format (SHA-256 = 64 hex characters)
-        invalid_hash_length = fact_trip.filter(
-            F.length(F.col("fact_hash")) != 64
-        ).count()
-        if invalid_hash_length > 0:
-            self.logger.error(
-                f"Found {invalid_hash_length:,} hashes with invalid length (expected 64)"
-            )
-            raise JobExecutionError(
-                f"Data integrity error: {invalid_hash_length} invalid hash lengths"
-            )
-
         self.logger.info("✓ All hash integrity checks passed")
 
-        # Log sample statistics
+        # Log statistics (already computed in the same aggregation)
         self.logger.info("Fact table statistics:")
-        fact_trip.select(
-            F.avg("trip_distance").alias("avg_distance"),
-            F.avg("fare_amount").alias("avg_fare"),
-            F.avg("trip_duration_minutes").alias("avg_duration_min"),
-            F.avg("tip_percentage").alias("avg_tip_pct"),
-        ).show()
+        self.logger.info(
+            f"  avg_distance: {validation_metrics['avg_distance']:.2f} miles"
+        )
+        self.logger.info(
+            f"  avg_fare: ${validation_metrics['avg_fare']:.2f}"
+        )
+        self.logger.info(
+            f"  avg_duration: {validation_metrics['avg_duration_min']:.2f} minutes"
+        )
+        self.logger.info(
+            f"  avg_tip_pct: {validation_metrics['avg_tip_pct']:.2f}%"
+        )
 
         return fact_trip
 

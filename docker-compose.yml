@@ -2,8 +2,9 @@ x-airflow-common: &airflow-common
   image: apache/airflow:2.10.4-python3.12
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/nyc_taxi
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
@@ -11,9 +12,9 @@ x-airflow-common: &airflow-common
     PROJECT_ID_BASE: ${PROJECT_ID_BASE:-nyc-taxi-etl}
     POSTGRES_HOST: postgres
     POSTGRES_PORT: 5432
-    POSTGRES_USER: ${POSTGRES_USER:-postgres}
-    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    POSTGRES_DB: ${POSTGRES_DB:-nyc_taxi}
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_DB: ${POSTGRES_DB}
     GCS_BUCKET: ${GCS_BUCKET}
     GCP_PROJECT_ID: ${GCP_PROJECT_ID}
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-credentials.json
@@ -35,14 +36,14 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-nyc_taxi}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/postgres:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-nyc_taxi}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -54,9 +55,9 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-nyc_taxi}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
       GCS_BUCKET: ${GCS_BUCKET}
       GCP_PROJECT_ID: ${GCP_PROJECT_ID}
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
@@ -72,20 +73,24 @@ services:
     container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-airflow-init
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/nyc_taxi
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
       _AIRFLOW_DB_MIGRATE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
-      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
-      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+      _AIRFLOW_WWW_USER_FIRSTNAME: ${AIRFLOW_ADMIN_FIRSTNAME}
+      _AIRFLOW_WWW_USER_LASTNAME: ${AIRFLOW_ADMIN_LASTNAME}
+      _AIRFLOW_WWW_USER_EMAIL: ${AIRFLOW_ADMIN_EMAIL}
+      _AIRFLOW_WWW_USER_ROLE: ${AIRFLOW_ADMIN_ROLE}
     entrypoint: /bin/bash
     command:
       - -c
       - |
-        airflow db migrate && airflow users create --username $${_AIRFLOW_WWW_USER_USERNAME} --password $${_AIRFLOW_WWW_USER_PASSWORD} --firstname Admin --lastname User --role Admin --email admin@example.com || true
+        airflow db migrate && airflow users create --username $${_AIRFLOW_WWW_USER_USERNAME} --password $${_AIRFLOW_WWW_USER_PASSWORD} --firstname $${_AIRFLOW_WWW_USER_FIRSTNAME} --lastname $${_AIRFLOW_WWW_USER_LASTNAME} --role $${_AIRFLOW_WWW_USER_ROLE} --email $${_AIRFLOW_WWW_USER_EMAIL} || true
     restart: "no"
   airflow-webserver:
     <<: *airflow-common
