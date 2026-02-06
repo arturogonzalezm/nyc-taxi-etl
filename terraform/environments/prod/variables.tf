@@ -43,6 +43,11 @@ variable "etl_container_image" {
   default     = ""
 }
 
+variable "cicd_service_account" {
+  description = "Service account email used by CI/CD pipeline (from dev environment)"
+  type        = string
+}
+
 # =============================================================================
 # LOCAL VALUES
 # =============================================================================

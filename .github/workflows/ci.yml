@@ -446,11 +446,15 @@ jobs:
       - name: Terraform Plan (Production)
         working-directory: ${{ env.PROD_TF_DIR }}
         run: |
+          # CI/CD service account from dev environment
+          CICD_SA="${{ env.PROJECT_ID_BASE }}-dev-sa-${{ env.INSTANCE_NUMBER }}@${{ env.PROJECT_ID_BASE }}-dev-${{ env.INSTANCE_NUMBER }}.iam.gserviceaccount.com"
+          
           terraform plan \
             -var="project_id=${{ env.PROD_PROJECT_ID }}" \
             -var="region=${{ env.REGION }}" \
             -var="environment=prod" \
             -var="project_id_base=${{ env.PROJECT_ID_BASE }}" \
+            -var="cicd_service_account=${CICD_SA}" \
             -out=tfplan
 
       - name: Terraform Apply (Production)
