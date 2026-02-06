@@ -50,5 +50,5 @@ RUN pip install --no-cache-dir --no-deps -e .
 # Set Python path
 ENV PYTHONPATH=/app:/app/environments/dev
 
-# Keep container running for development
-CMD ["tail", "-f", "/dev/null"]
+# Cloud Run HTTP entrypoint - listens on $PORT (default 8080)
+CMD ["python", "-m", "environments.prod.etl.server"]
