@@ -123,9 +123,7 @@ class SparkSessionManager:
                     # the "impersonated_service_account type not recognized"
                     # error that older connectors throw when reading ADC files
                     # generated with --impersonate-service-account.
-                    .config(
-                        "spark.hadoop.fs.gs.auth.type", "APPLICATION_DEFAULT"
-                    )
+                    .config("spark.hadoop.fs.gs.auth.type", "APPLICATION_DEFAULT")
                     # GCS resilience settings - handle transient network issues
                     .config("spark.hadoop.fs.gs.http.connect-timeout", "120000")
                     .config("spark.hadoop.fs.gs.http.read-timeout", "120000")
