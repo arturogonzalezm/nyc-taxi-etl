@@ -136,13 +136,14 @@ jobs:
         run: pip install ".[dev]"
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --cov=environments/dev/etl --cov=tests --cov-report=xml --cov-report=term
+        run: pytest tests/ -v --cov=environments/dev/etl --cov=tests --cov-report=xml --cov-report=term --junitxml=junit.xml
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: junit.xml
 
   # =============================================================================
   # STAGE 5: Integration Tests
