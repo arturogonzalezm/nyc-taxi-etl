@@ -243,7 +243,7 @@ docker-compose exec etl python -m dev.etl.jobs.misc.zone_lookup_ingestion_job
 docker-compose exec etl python dev/etl/jobs/gold/taxi_gold_job.py --taxi-type yellow --year 2025 --month 1 --end-year 2025 --end-month 11
 
 # Load to PostgreSQL
-docker-compose exec etl python dev/etl/jobs/load/postgres_load_job.py --taxi-type yellow
+docker-compose exec etl python dev/etl/jobs/load/bigquery_load_job.py --taxi-type yellow
 ```
 
 Alternative using `docker exec`:
