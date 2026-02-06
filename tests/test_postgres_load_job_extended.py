@@ -590,9 +590,7 @@ class TestPostgresLoadJobEdgeCases:
     @patch("environments.dev.etl.jobs.load.postgres_load_job.psycopg2")
     def test_load_dimension_with_default_port(self, mock_psycopg2):
         """Test _load_dimension uses default port when not specified."""
-        job = PostgresLoadJob(
-            "yellow", postgres_url="jdbc:postgresql://myhost/mydb"
-        )
+        job = PostgresLoadJob("yellow", postgres_url="jdbc:postgresql://myhost/mydb")
 
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
