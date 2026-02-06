@@ -148,7 +148,7 @@ nuke:
 	@docker system df
 postgres-start: init
 	@echo "$(CYAN)Starting PostgreSQL...$(NC)"
-	@docker-compose up -d postgres
+	@docker-compose up -d bigquery
 	@echo ""
 	@echo "$(GREEN)PostgreSQL started!$(NC)"
 	@echo "$(YELLOW)Connection details:$(NC)"
@@ -159,32 +159,32 @@ postgres-start: init
 	@echo ""
 	@echo "$(CYAN)Waiting for PostgreSQL to be ready...$(NC)"
 	@sleep 3
-	@docker-compose exec postgres pg_isready -U postgres || echo "$(YELLOW)PostgreSQL is starting up...$(NC)"
+	@docker-compose exec bigquery pg_isready -U postgres || echo "$(YELLOW)PostgreSQL is starting up...$(NC)"
 postgres-stop:
 	@echo "$(CYAN)Stopping PostgreSQL...$(NC)"
-	@docker-compose stop postgres
+	@docker-compose stop bigquery
 	@echo "$(GREEN)PostgreSQL stopped$(NC)"
 postgres-nuke: postgres-stop
 	@echo "$(RED)⚠️  WARNING: This will destroy all PostgreSQL data!$(NC)"
 	@echo "$(YELLOW)Press Ctrl+C to cancel, or Enter to continue...$(NC)"
 	@read -r confirm
 	@echo "$(CYAN)Removing PostgreSQL container and volumes...$(NC)"
-	@docker-compose rm -f postgres
+	@docker-compose rm -f bigquery
 	@docker volume rm nyc-taxi-etl_postgres_data 2>/dev/null || echo "$(YELLOW)Volume already removed$(NC)"
 	@echo "$(GREEN)✓ PostgreSQL completely removed$(NC)"
 	@echo ""
 	@echo "$(CYAN)Recreating PostgreSQL from scratch...$(NC)"
-	@docker-compose up -d postgres
+	@docker-compose up -d bigquery
 	@echo "$(CYAN)Waiting for PostgreSQL to initialize and run init scripts...$(NC)"
 	@sleep 8
-	@until docker-compose exec -T postgres pg_isready -U postgres > /dev/null 2>&1; do \
+	@until docker-compose exec -T bigquery pg_isready -U postgres > /dev/null 2>&1; do \
 		echo "$(YELLOW)  Still initializing...$(NC)"; \
 		sleep 2; \
 	done
 	@echo "$(GREEN)✓ PostgreSQL is ready!$(NC)"
 	@echo ""
 	@echo "$(CYAN)Verifying database and tables...$(NC)"
-	@docker-compose exec -T postgres psql -U postgres -d nyc_taxi -c "\dt taxi.*" || echo "$(RED)Tables not created yet$(NC)"
+	@docker-compose exec -T bigquery psql -U postgres -d nyc_taxi -c "\dt taxi.*" || echo "$(RED)Tables not created yet$(NC)"
 	@echo ""
 	@echo "$(GREEN)✓ PostgreSQL recreated with fresh schema!$(NC)"
 	@echo "$(YELLOW)Schema: taxi$(NC)"
@@ -192,23 +192,23 @@ postgres-nuke: postgres-stop
 	@echo "$(YELLOW)All indexes and constraints created automatically$(NC)"
 postgres-create-tables: postgres-start
 	@echo "$(CYAN)Creating PostgreSQL tables...$(NC)"
-	@docker-compose exec postgres psql -U postgres -d nyc_taxi -f /docker-entrypoint-initdb.d/create_dimensional_model.sql
+	@docker-compose exec bigquery psql -U postgres -d nyc_taxi -f /docker-entrypoint-initdb.d/create_dimensional_model.sql
 	@echo "$(GREEN)Tables created successfully!$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Tables created:$(NC)"
-	@docker-compose exec postgres psql -U postgres -d nyc_taxi -c "\dt taxi.*"
+	@docker-compose exec bigquery psql -U postgres -d nyc_taxi -c "\dt taxi.*"
 postgres-shell:
 	@echo "$(CYAN)Connecting to PostgreSQL...$(NC)"
-	@docker-compose exec postgres psql -U postgres -d nyc_taxi
+	@docker-compose exec bigquery psql -U postgres -d nyc_taxi
 postgres-status:
 	@echo "$(CYAN)PostgreSQL Status:$(NC)"
-	@docker-compose exec postgres pg_isready -U postgres && echo "$(GREEN)✓ PostgreSQL is ready$(NC)" || echo "$(YELLOW)✗ PostgreSQL is not ready$(NC)"
+	@docker-compose exec bigquery pg_isready -U postgres && echo "$(GREEN)✓ PostgreSQL is ready$(NC)" || echo "$(YELLOW)✗ PostgreSQL is not ready$(NC)"
 	@echo ""
 	@echo "$(CYAN)Database Info:$(NC)"
-	@docker-compose exec postgres psql -U postgres -d nyc_taxi -c "SELECT version();" 2>/dev/null || echo "$(YELLOW)Cannot connect to PostgreSQL$(NC)"
+	@docker-compose exec bigquery psql -U postgres -d nyc_taxi -c "SELECT version();" 2>/dev/null || echo "$(YELLOW)Cannot connect to PostgreSQL$(NC)"
 	@echo ""
 	@echo "$(CYAN)Table Counts:$(NC)"
-	@docker-compose exec postgres psql -U postgres -d nyc_taxi -c "\
+	@docker-compose exec bigquery psql -U postgres -d nyc_taxi -c "\
 		SELECT 'dim_date' as table_name, COUNT(*) as records FROM taxi.dim_date \
 		UNION ALL SELECT 'dim_location', COUNT(*) FROM taxi.dim_location \
 		UNION ALL SELECT 'dim_payment', COUNT(*) FROM taxi.dim_payment \

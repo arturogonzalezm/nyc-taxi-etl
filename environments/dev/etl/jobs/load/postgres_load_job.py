@@ -24,6 +24,8 @@ Design Patterns:
 
 import sys
 import os
+import psycopg2
+
 from pathlib import Path
 
 # Add project root to path for imports when running as script
@@ -282,7 +284,6 @@ class PostgresLoadJob(BaseSparkJob):
         :params table_name: PostgreSQL table name (with schema)
         :params dim_name: Dimension name for logging
         """
-        import psycopg2
 
         self.logger.info(f"Loading {dim_name} to {table_name}...")
         record_count = df.count()
@@ -389,7 +390,6 @@ class PostgresLoadJob(BaseSparkJob):
         :params df: DataFrame to upsert
         :params target_table: Target table name (e.g., "taxi.fact_trip")
         """
-        import psycopg2
 
         temp_table = f"{target_table}_temp"
         self.logger.info(f"Creating temporary table: {temp_table}")
@@ -697,9 +697,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--year", type=int, help="Year filter (optional)")
     parser.add_argument("--month", type=int, help="Month filter (optional)")
-    parser.add_argument("--bigquery-url", type=str, help="PostgreSQL JDBC URL")
-    parser.add_argument("--bigquery-user", type=str, help="PostgreSQL username")
-    parser.add_argument("--bigquery-password", type=str, help="PostgreSQL password")
+    parser.add_argument("--postgres-url", type=str, help="PostgreSQL JDBC URL")
+    parser.add_argument("--postgres-user", type=str, help="PostgreSQL username")
+    parser.add_argument("--postgres-password", type=str, help="PostgreSQL password")
 
     args = parser.parse_args()
 
