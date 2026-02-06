@@ -383,7 +383,7 @@ class BigQueryLoadJob(BaseSparkJob):
                 client = bigquery.Client(project=self.project_id)
 
                 query_job = client.query(merge_sql)
-                result = query_job.result()  # Wait for completion
+                query_job.result()  # Wait for completion
 
                 # Get rows affected
                 rows_inserted = query_job.num_dml_affected_rows or 0
