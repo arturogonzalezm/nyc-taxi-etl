@@ -17,8 +17,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-# Copy Spark jars and PySpark from official image (avoids 300+ second pip install)
+# Copy Spark jars, bin, and PySpark from official image (avoids 300+ second pip install)
 COPY --from=spark-base /opt/spark/jars /opt/spark/jars
+COPY --from=spark-base /opt/spark/bin /opt/spark/bin
 COPY --from=spark-base /opt/spark/python/pyspark /usr/local/lib/python3.12/site-packages/pyspark
 COPY --from=spark-base /opt/spark/python/lib /opt/spark/python/lib
 
