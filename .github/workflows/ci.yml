@@ -204,7 +204,7 @@ jobs:
     name: 6. Terraform Deploy Dev
     runs-on: ubuntu-latest
     needs: [integration-tests]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/develop/'))
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/develop')
     permissions:
       contents: read
       id-token: write
@@ -420,7 +420,7 @@ jobs:
           PROJECT_ID_BASE="${config_vars[PROJECT_ID_BASE]}"
           REGION="${config_vars[REGION]}"
           INSTANCE_NUMBER="${config_vars[INSTANCE_NUMBER]}"
-          echo "PROD_PROJECT_ID=${PROJECT_ID_BASE}-prod-${REGION}-${INSTANCE_NUMBER}" >> $GITHUB_ENV
+          echo "PROD_PROJECT_ID=${PROJECT_ID_BASE}-prod-${INSTANCE_NUMBER}" >> $GITHUB_ENV
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -455,6 +455,8 @@ jobs:
             -var="environment=prod" \
             -var="project_id_base=${{ env.PROJECT_ID_BASE }}" \
             -var="cicd_service_account=${CICD_SA}" \
+            -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+            -var="organisation_id=${{ secrets.GCP_ORGANISATION_ID }}" \
             -out=tfplan
 
       - name: Terraform Apply (Production)
