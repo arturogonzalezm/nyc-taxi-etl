@@ -2,6 +2,11 @@
 # VARIABLES
 # =============================================================================
 
+variable "project_id" {
+  description = "GCP Project ID"
+  type        = string
+}
+
 variable "project_id_base" {
   description = "Base name for project resources"
   type        = string
