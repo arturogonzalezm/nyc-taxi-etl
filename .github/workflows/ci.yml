@@ -474,6 +474,11 @@ jobs:
       # =========================================================================
       # STEP 2: Build and Push ETL Container Image
       # =========================================================================
+      - name: Wait for IAM propagation
+        run: |
+          echo "Waiting 60s for IAM bindings to propagate across GCP..."
+          sleep 60
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
