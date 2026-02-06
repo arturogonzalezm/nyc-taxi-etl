@@ -395,14 +395,20 @@ jobs:
         id: config
         run: |
           # Parse prod terraform.tfvars for base configuration
+          # Store values in local variables first, then export to GITHUB_ENV
+          declare -A config_vars
           while IFS='=' read -r key value; do
             [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
             key=$(echo "$key" | xargs)
             value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
+            config_vars["${key^^}"]="$value"
             echo "${key^^}=$value" >> $GITHUB_ENV
           done < terraform/environments/prod/config.tfvars
           
-          # Set production-specific variables
+          # Set production-specific variables using parsed values
+          PROJECT_ID_BASE="${config_vars[PROJECT_ID_BASE]}"
+          REGION="${config_vars[REGION]}"
+          INSTANCE_NUMBER="${config_vars[INSTANCE_NUMBER]}"
           echo "PROD_PROJECT_ID=${PROJECT_ID_BASE}-prod-${REGION}-${INSTANCE_NUMBER}" >> $GITHUB_ENV
 
       - name: Authenticate to Google Cloud

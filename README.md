@@ -20,13 +20,14 @@ A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Comm
 
 ### Additional Documentation
 
-- [Architecture Details](docs/ARCHITECTURE.md)
-- [Authentication Guide](docs/AUTHENTICATION.md)
-- [Dataset Explanation](docs/DATASET.md)
-- [Data Model and Schema](docs/DATA_MODEL.md)
-- [Historical Strategy](docs/HISTORICAL_STRATEGY.md)
-- [Local Setup Guide](docs/LOCAL_SETUP.md)
-- [Terraform Reference](terraform/README.md)
+- [Architecture Diagram](docs/1.ARCHITECTURE.md)
+- [Dataset explanation](docs/2.DATASET.md)
+- [Data model and schema (fact + dims)](docs/3.DATA_MODEL.md)
+- [Historical Strategy](docs/4.HISTORICAL_STRATEGY.md)
+- [How to run locally (Docker)](docs/5.LOCAL_SETUP.md)
+- [How Terraform is structured](docs/6.TERRAFORM.md)
+- [Limitations and what you would improve next](docs/7.LIMITATIONS_IMPROVEMENTS.md)
+- [Authentication Guide](docs/8.AUTHENTICATION.md)
 
 ## Architecture
 
@@ -73,7 +74,7 @@ The project includes Terraform configuration for automated GCP infrastructure pr
 - **Workload Identity Federation** for secure GitHub Actions authentication
 - **IAM Roles** for storage and BigQuery access
 
-See [terraform/README.md](terraform/README.md) for detailed infrastructure documentation.
+See [Terraform Infrastructure](docs/6.TERRAFORM.md) for detailed infrastructure documentation.
 
 ### CI/CD Workflows
 
