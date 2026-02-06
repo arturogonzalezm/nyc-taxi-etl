@@ -150,7 +150,7 @@ jobs:
           python -c "from dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob; print('✓ Bronze ingestion module OK')"
           python -c "from dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob; print('✓ Gold transformation module OK')"
           python -c "from dev.etl.jobs.load.postgres_load_job import PostgresLoadJob; print('✓ Postgres load module OK')"
-          python -c "from dev.etl.jobs.bronze.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Zone lookup module OK')"
+          python -c "from dev.etl.jobs.misc.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Zone lookup module OK')"
         env:
           GCS_BUCKET: test-bucket
           GCP_PROJECT_ID: test-project
