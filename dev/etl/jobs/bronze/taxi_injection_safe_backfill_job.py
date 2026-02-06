@@ -128,9 +128,9 @@ def safe_backfill_month(
     Safely backfill a single month.
     :returns: Dictionary with results
     """
-    from etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob
+    from dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob
 
-    from etl.jobs.utils.config import JobConfig
+    from dev.etl.jobs.utils.config import JobConfig
 
     config = JobConfig()
     period = f"{year}-{month:02d}"
@@ -267,7 +267,7 @@ def safe_historical_backfill(
     :params delete_existing: If True, deletes existing partitions before re-ingest
     :returns: Dictionary with results for each month
     """
-    from etl.jobs.utils.spark_manager import SparkSessionManager
+    from dev.etl.jobs.utils.spark_manager import SparkSessionManager
 
     logger.info("\n" + "#" * 80)
     logger.info("SAFE HISTORICAL BACKFILL")

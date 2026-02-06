@@ -6,9 +6,9 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 import logging
 
-from etl.jobs.base_job import BaseSparkJob, JobExecutionError
-from etl.jobs.utils.config import JobConfig
-from etl.jobs.utils.spark_manager import SparkSessionManager
+from dev.etl.jobs.base_job import BaseSparkJob, JobExecutionError
+from dev.etl.jobs.utils.config import JobConfig
+from dev.etl.jobs.utils.spark_manager import SparkSessionManager
 
 
 class TestJobExecutionError:

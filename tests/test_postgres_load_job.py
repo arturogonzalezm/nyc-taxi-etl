@@ -12,8 +12,8 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
-from etl.jobs.load.postgres_load_job import PostgresLoadJob, run_postgres_load
-from etl.jobs.utils.config import JobConfig
+from dev.etl.jobs.load.postgres_load_job import PostgresLoadJob, run_postgres_load
+from dev.etl.jobs.utils.config import JobConfig
 
 
 class TestPostgresLoadJobInit:

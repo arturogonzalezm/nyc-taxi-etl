@@ -40,7 +40,7 @@ with DAG(
     ingest_taxi_data = BashOperator(
         task_id="ingest_taxi_data",
         bash_command=(
-            f"docker exec {ETL_CONTAINER} python -m etl.jobs.bronze.taxi_ingestion_job "
+            f"docker exec {ETL_CONTAINER} python -m dev.etl.jobs.bronze.taxi_ingestion_job "
             "--taxi-type {{ params.taxi_type }} "
             "--start-year {{ params.start_year }} "
             "--start-month {{ params.start_month }} "

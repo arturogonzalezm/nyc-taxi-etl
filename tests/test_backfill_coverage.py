@@ -11,14 +11,14 @@ Tests cover uncovered functions:
 
 from unittest.mock import patch, MagicMock
 
-from etl.jobs.bronze.taxi_injection_safe_backfill_job import (
+from dev.etl.jobs.bronze.taxi_injection_safe_backfill_job import (
     parse_month_spec,
     check_partition_exists,
     delete_partition,
     safe_backfill_month,
     safe_historical_backfill,
 )
-from etl.jobs.utils.config import JobConfig
+from dev.etl.jobs.utils.config import JobConfig
 
 
 class TestParseMonthSpec:
@@ -162,7 +162,7 @@ class TestSafeBackfillMonth:
         mock_spark = MagicMock()
 
         with patch(
-            "etl.jobs.bronze.taxi_injection_safe_backfill_job.check_partition_exists"
+            "dev.etl.jobs.bronze.taxi_injection_safe_backfill_job.check_partition_exists"
         ) as mock_check:
             mock_check.return_value = (True, 500, 500)  # Exists
 
@@ -177,11 +177,11 @@ class TestSafeBackfillMonth:
         mock_spark = MagicMock()
 
         with patch(
-            "etl.jobs.bronze.taxi_injection_safe_backfill_job.check_partition_exists"
+            "dev.etl.jobs.bronze.taxi_injection_safe_backfill_job.check_partition_exists"
         ) as mock_check:
             mock_check.return_value = (True, 500, 500)  # Exists
             with patch(
-                "etl.jobs.bronze.taxi_injection_safe_backfill_job.delete_partition",
+                "dev.etl.jobs.bronze.taxi_injection_safe_backfill_job.delete_partition",
                 return_value=False,
             ):
                 result = safe_backfill_month(
@@ -205,11 +205,11 @@ class TestSafeHistoricalBackfill:
 
     def test_safe_historical_backfill_processes_months(self):
         """Test safe_historical_backfill processes multiple months."""
-        with patch("etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+        with patch("dev.etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
             mock_spark = MagicMock()
             mock_sm.get_session.return_value = mock_spark
             with patch(
-                "etl.jobs.bronze.taxi_injection_safe_backfill_job.safe_backfill_month"
+                "dev.etl.jobs.bronze.taxi_injection_safe_backfill_job.safe_backfill_month"
             ) as mock_backfill:
                 mock_backfill.side_effect = [
                     {
@@ -235,7 +235,7 @@ class TestSafeHistoricalBackfill:
 
     def test_safe_historical_backfill_empty_months(self):
         """Test safe_historical_backfill with empty months list."""
-        with patch("etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+        with patch("dev.etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
             mock_spark = MagicMock()
             mock_sm.get_session.return_value = mock_spark
 
@@ -245,11 +245,11 @@ class TestSafeHistoricalBackfill:
 
     def test_safe_historical_backfill_with_delete(self):
         """Test safe_historical_backfill with delete_existing=True."""
-        with patch("etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
+        with patch("dev.etl.jobs.utils.spark_manager.SparkSessionManager") as mock_sm:
             mock_spark = MagicMock()
             mock_sm.get_session.return_value = mock_spark
             with patch(
-                "etl.jobs.bronze.taxi_injection_safe_backfill_job.safe_backfill_month"
+                "dev.etl.jobs.bronze.taxi_injection_safe_backfill_job.safe_backfill_month"
             ) as mock_backfill:
                 mock_backfill.return_value = {
                     "status": "SUCCESS",

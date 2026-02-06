@@ -4,9 +4,9 @@ Extended validation tests for ETL jobs to improve coverage.
 
 import pytest
 
-from etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob, DownloadError
-from etl.jobs.gold.taxi_gold_job import TaxiGoldJob
-from etl.jobs.load.postgres_load_job import PostgresLoadJob
+from dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob, DownloadError
+from dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob
+from dev.etl.jobs.load.postgres_load_job import PostgresLoadJob
 
 
 class TestTaxiIngestionJobValidation:

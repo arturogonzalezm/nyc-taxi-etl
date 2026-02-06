@@ -6,8 +6,8 @@ import os
 import pytest
 from unittest.mock import patch
 
-from etl.jobs.utils.config import GCSConfig, JobConfig
-from etl.jobs.utils.terraform_config import get_gcp_config
+from dev.etl.jobs.utils.config import GCSConfig, JobConfig
+from dev.etl.jobs.utils.terraform_config import get_gcp_config
 
 
 class TestGCSConfig:

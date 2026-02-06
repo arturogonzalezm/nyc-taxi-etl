@@ -21,9 +21,10 @@ x-airflow-common: &airflow-common
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-credentials.json
     CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /opt/airflow/gcp-credentials.json
   volumes:
-    - ./dags:/opt/airflow/dags
+    - ./dev/dags:/opt/airflow/dags
     - ${HOME}/.config/gcloud/application_default_credentials.json:/opt/airflow/gcp-credentials.json:ro
-    - ./etl:/opt/airflow/etl
+    - ./dev/etl:/opt/airflow/etl
+    - ./dev:/opt/airflow/dev
     - airflow_logs:/opt/airflow/logs
     - /var/run/docker.sock:/var/run/docker.sock
   depends_on:
@@ -50,7 +51,7 @@ services:
   etl:
     build:
       context: .
-      dockerfile: etl/Dockerfile
+      dockerfile: dev/etl/Dockerfile
     container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-etl
     environment:
       POSTGRES_HOST: postgres
@@ -66,7 +67,8 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./etl:/app/etl
+      - ./dev/etl:/app/etl
+      - ./dev:/app/dev
       - ./terraform:/app/terraform:ro
       - ${HOME}/.config/gcloud/application_default_credentials.json:/app/gcp-credentials.json:ro
   airflow-init:

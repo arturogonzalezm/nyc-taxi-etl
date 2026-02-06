@@ -38,7 +38,7 @@ from pathlib import Path
 
 # Add project root to path for imports when running as script
 if __name__ == "__main__":
-    project_root = Path(__file__).resolve().parents[3]
+    project_root = Path(__file__).resolve().parents[4]
     sys.path.insert(0, str(project_root))
 
 import logging
@@ -47,8 +47,8 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import IntegerType, DoubleType
 
-from etl.jobs.base_job import BaseSparkJob, JobExecutionError
-from etl.jobs.utils.config import JobConfig
+from dev.etl.jobs.base_job import BaseSparkJob, JobExecutionError
+from dev.etl.jobs.utils.config import JobConfig
 
 logger = logging.getLogger(__name__)
 

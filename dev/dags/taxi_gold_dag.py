@@ -40,7 +40,7 @@ with DAG(
     transform_to_gold = BashOperator(
         task_id="transform_to_gold",
         bash_command=(
-            f"docker exec {ETL_CONTAINER} python -m etl.jobs.gold.taxi_gold_job "
+            f"docker exec {ETL_CONTAINER} python -m dev.etl.jobs.gold.taxi_gold_job "
             "--taxi-type {{ params.taxi_type }} "
             "--year {{ params.start_year }} "
             "--month {{ params.start_month }} "

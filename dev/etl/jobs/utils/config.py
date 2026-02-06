@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Optional
 from pathlib import Path
 
-from etl.jobs.utils.terraform_config import get_gcp_config_with_fallback
+from dev.etl.jobs.utils.terraform_config import get_gcp_config_with_fallback
 
 
 def _get_bucket() -> str:

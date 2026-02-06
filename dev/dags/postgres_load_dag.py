@@ -1,6 +1,6 @@
 """
-DAG for Misc Layer - Zone Lookup Ingestion
-No date range parameters required.
+DAG for Load Layer - PostgreSQL Load
+Handles: --taxi-type
 """
 
 import os
@@ -21,19 +21,22 @@ default_args = {
 }
 
 with DAG(
-    dag_id="zone_lookup_ingestion_dag",
+    dag_id="postgres_load_dag",
     default_args=default_args,
-    description="Ingest taxi zone lookup reference data to Misc layer",
+    description="Load taxi data from Gold layer to PostgreSQL",
     schedule=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["misc", "ingestion", "zone_lookup"],
+    tags=["load", "postgres", "taxi"],
+    params={
+        "taxi_type": "yellow",
+    },
 ) as dag:
 
-    ingest_zone_lookup = BashOperator(
-        task_id="ingest_zone_lookup",
+    load_to_postgres = BashOperator(
+        task_id="load_to_postgres",
         bash_command=(
-            f"docker exec {ETL_CONTAINER} "
-            "python -m etl.jobs.misc.zone_lookup_ingestion_job"
+            f"docker exec {ETL_CONTAINER} python -m dev.etl.jobs.load.postgres_load_job "
+            "--taxi-type {{ params.taxi_type }}"
         ),
     )

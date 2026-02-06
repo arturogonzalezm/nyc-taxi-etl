@@ -9,6 +9,6 @@ try:
     from .taxi_gold_job import TaxiGoldJob, run_gold_job
 except ImportError:
     # Fallback for absolute imports
-    from etl.jobs.gold.taxi_gold_job import TaxiGoldJob, run_gold_job
+    from dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob, run_gold_job
 
 __all__ = ["TaxiGoldJob", "run_gold_job"]

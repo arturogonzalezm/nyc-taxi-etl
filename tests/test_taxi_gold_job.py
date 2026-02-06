@@ -11,8 +11,8 @@ Tests cover:
 import pytest
 from unittest.mock import patch
 
-from etl.jobs.gold.taxi_gold_job import TaxiGoldJob, run_gold_job
-from etl.jobs.utils.config import JobConfig
+from dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob, run_gold_job
+from dev.etl.jobs.utils.config import JobConfig
 
 
 class TestTaxiGoldJobConstants:

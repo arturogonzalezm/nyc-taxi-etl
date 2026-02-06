@@ -35,15 +35,15 @@ from pathlib import Path
 from typing import Literal, Optional
 
 # Add project root to path for imports when running as script
-if __name__ == "__main__" or "etl.jobs" not in sys.modules:
-    project_root = Path(__file__).resolve().parents[3]
+if __name__ == "__main__" or "dev.etl.jobs" not in sys.modules:
+    project_root = Path(__file__).resolve().parents[4]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
 from pyspark.sql import DataFrame
 
-from etl.jobs.base_job import BaseSparkJob, JobExecutionError
-from etl.jobs.utils.config import JobConfig
+from dev.etl.jobs.base_job import BaseSparkJob, JobExecutionError
+from dev.etl.jobs.utils.config import JobConfig
 
 
 class DataValidationError(JobExecutionError):

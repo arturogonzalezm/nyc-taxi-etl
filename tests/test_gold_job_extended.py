@@ -5,9 +5,9 @@ Extended tests for TaxiGoldJob to improve coverage.
 import pytest
 from unittest.mock import patch, MagicMock
 
-from etl.jobs.gold.taxi_gold_job import TaxiGoldJob, DataQualityError, run_gold_job
-from etl.jobs.base_job import BaseSparkJob, JobExecutionError
-from etl.jobs.utils.config import JobConfig
+from dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob, DataQualityError, run_gold_job
+from dev.etl.jobs.base_job import BaseSparkJob, JobExecutionError
+from dev.etl.jobs.utils.config import JobConfig
 
 
 class TestTaxiGoldJobInheritance:

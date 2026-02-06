@@ -35,14 +35,14 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["etl*", "dags*"]
+include = ["dev*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "dev"]
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["etl", "dags", "tests"]
+source = ["dev/etl", "dev/dags", "tests"]
 branch = true
 omit = ["*/__init__.py"]
 

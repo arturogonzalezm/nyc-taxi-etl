@@ -53,7 +53,7 @@ This hash serves as:
 For regular monthly data loads:
 
 ```bash
-python -m etl.jobs.bronze.taxi_ingestion_job \
+python -m dev.etl.jobs.bronze.taxi_ingestion_job \
     --taxi-type yellow \
     --year 2024 \
     --month 1
@@ -70,7 +70,7 @@ python -m etl.jobs.bronze.taxi_ingestion_job \
 For loading multiple months at once:
 
 ```bash
-python -m etl.jobs.bronze.taxi_ingestion_job \
+python -m dev.etl.jobs.bronze.taxi_ingestion_job \
     --taxi-type yellow \
     --start-year 2023 --start-month 1 \
     --end-year 2023 --end-month 12
