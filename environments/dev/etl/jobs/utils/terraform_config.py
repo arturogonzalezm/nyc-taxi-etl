@@ -1,7 +1,7 @@
 """
 Terraform Configuration Parser
 
-Reads GCP configuration from terraform.tfvars and computes
+Reads GCP configuration from config.tfvars and computes
 the full project ID and bucket name using the same patterns as Terraform locals.
 """
 
@@ -13,22 +13,22 @@ from typing import Optional, Tuple
 
 def parse_tfvars(tfvars_path: Optional[str] = None) -> dict:
     """
-    Parse terraform.tfvars file and return variables as a dictionary.
+    Parse config.tfvars file and return variables as a dictionary.
 
-    :param tfvars_path: Path to terraform.tfvars file. If None, searches for it relative to the project root.
+    :param tfvars_path: Path to config.tfvars file. If None, searches for it relative to the project root.
     :returns: Dictionary of variable names to values.
     """
     if tfvars_path is None:
-        # Try to find terraform.tfvars relative to this file or project root
+        # Try to find config.tfvars relative to this file or project root
         current_dir = Path(__file__).resolve().parent
         # Go up to project root (environments/dev/etl/jobs/utils -> project root)
         project_root = current_dir.parent.parent.parent.parent.parent
-        tfvars_path = project_root / "terraform" / "terraform.tfvars"
+        tfvars_path = project_root / "terraform" / "environments" / "dev" / "config.tfvars"
     else:
         tfvars_path = Path(tfvars_path)
 
     if not tfvars_path.exists():
-        raise FileNotFoundError(f"terraform.tfvars not found at {tfvars_path}")
+        raise FileNotFoundError(f"config.tfvars not found at {tfvars_path}")
 
     variables = {}
     # Pattern to match: variable_name = "value" or variable_name = value
@@ -52,15 +52,15 @@ def parse_tfvars(tfvars_path: Optional[str] = None) -> dict:
 
 def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
     """
-    Get GCP_PROJECT_ID and GCS_BUCKET computed from terraform.tfvars.
+    Get GCP_PROJECT_ID and GCS_BUCKET computed from config.tfvars.
 
     Uses the same patterns as Terraform locals (variables.tf):
     - full_project_id: ${project_id_base}-${environment}-${region}-${instance_number}
     - full_bucket_id: ${project_id_base}-${environment}-${resource_type}-${region}-${instance_number}
 
-    :param "tfvars_path: Optional path to terraform.tfvars file.
+    :param tfvars_path: Optional path to config.tfvars file.
     :returns: Tuple of (project_id, bucket_name)
-    :raises FileNotFoundError: If terraform.tfvars not found.
+    :raises FileNotFoundError: If config.tfvars not found.
     :raises KeyError: If required variables are missing.
     """
     tfvars = parse_tfvars(tfvars_path)
@@ -74,7 +74,7 @@ def get_gcp_config(tfvars_path: Optional[str] = None) -> Tuple[str, str]:
     ]
     missing = [v for v in required_vars if v not in tfvars]
     if missing:
-        raise KeyError(f"Missing required variables in terraform.tfvars: {missing}")
+        raise KeyError(f"Missing required variables in config.tfvars: {missing}")
 
     # Compute using same patterns as Terraform locals (variables.tf:91-95)
     project_id = (
@@ -100,7 +100,7 @@ def get_gcp_config_with_fallback() -> Tuple[str, str]:
     """
     Get GCP config with fallback chain:
     1. Environment variables (GCP_PROJECT_ID, GCS_BUCKET)
-    2. terraform.tfvars parsing
+    2. config.tfvars parsing
 
     :returns Tuple of (project_id, bucket_name)
     """
@@ -111,7 +111,7 @@ def get_gcp_config_with_fallback() -> Tuple[str, str]:
     if project_id and bucket_name:
         return project_id, bucket_name
 
-    # Try to parse from terraform.tfvars
+    # Try to parse from config.tfvars
     try:
         tf_project_id, tf_bucket_name = get_gcp_config()
         return (project_id or tf_project_id, bucket_name or tf_bucket_name)

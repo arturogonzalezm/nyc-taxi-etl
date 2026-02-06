@@ -61,11 +61,11 @@ check: init
 	echo "$(GREEN)All pre-flight checks passed!$(NC)"
 setup:
 	@echo "$(CYAN)Setting up GCP authentication...$(NC)"
-	@RESOURCE_TYPE=$$(grep 'resource_type' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
-	REGION=$$(grep 'region' terraform/config.tfvars | head -1 | sed 's/.*= *"//;s/"//'); \
-	PROJECT_ID_BASE=$$(grep 'project_id_base' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
-	ENVIRONMENT=$$(grep 'environment' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
-	INSTANCE_NUMBER=$$(grep 'instance_number' terraform/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	@RESOURCE_TYPE=$$(grep 'resource_type' terraform/environments/dev/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	REGION=$$(grep 'region' terraform/environments/dev/config.tfvars | head -1 | sed 's/.*= *"//;s/"//'); \
+	PROJECT_ID_BASE=$$(grep 'project_id_base' terraform/environments/dev/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	ENVIRONMENT=$$(grep 'environment' terraform/environments/dev/config.tfvars | sed 's/.*= *"//;s/"//'); \
+	INSTANCE_NUMBER=$$(grep 'instance_number' terraform/environments/dev/config.tfvars | sed 's/.*= *"//;s/"//'); \
 	PROJECT_ID="$${PROJECT_ID_BASE}-$${ENVIRONMENT}-$${INSTANCE_NUMBER}"; \
 	BUCKET="$${PROJECT_ID_BASE}-$${ENVIRONMENT}-$${RESOURCE_TYPE}-$${REGION}-$${INSTANCE_NUMBER}"; \
 	echo ""; \
