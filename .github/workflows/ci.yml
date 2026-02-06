@@ -6,7 +6,7 @@ on:
   push:
     branches: [main, develop, 'develop/*']
   pull_request:
-    branches: [main]
+    branches: [main, develop, 'develop/*']
 
 env:
   TF_VERSION: '1.5.0'
