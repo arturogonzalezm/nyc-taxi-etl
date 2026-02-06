@@ -126,7 +126,7 @@ resource "google_project_service" "compute" {
 
 # VPC Network
 resource "google_compute_network" "etl_vpc" {
-  name                    = "${google_project.prod_project.project_id_base}-${var.environment}-etl-vpc"
+  name                    = "${var.project_id_base}-${var.environment}-etl-vpc"
   project                 = google_project.prod_project.project_id
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
@@ -136,7 +136,7 @@ resource "google_compute_network" "etl_vpc" {
 
 # Subnet for Cloud Run VPC Connector
 resource "google_compute_subnetwork" "etl_subnet" {
-  name          = "${google_project.prod_project.project_id_base}-${var.environment}-etl-subnet"
+  name          = "${var.project_id_base}-${var.environment}-etl-subnet"
   project       = google_project.prod_project.project_id
   region        = var.region
   network       = google_compute_network.etl_vpc.id
@@ -147,7 +147,7 @@ resource "google_compute_subnetwork" "etl_subnet" {
 
 # Cloud Router for NAT
 resource "google_compute_router" "etl_router" {
-  name    = "${google_project.prod_project.project_id_base}-${var.environment}-etl-router"
+  name    = "${var.project_id_base}-${var.environment}-etl-router"
   project = google_project.prod_project.project_id
   region  = var.region
   network = google_compute_network.etl_vpc.id
@@ -156,7 +156,7 @@ resource "google_compute_router" "etl_router" {
 # Cloud NAT for outbound internet access
 # Required for Cloud Run to reach external URLs (NYC TLC CloudFront)
 resource "google_compute_router_nat" "etl_nat" {
-  name                               = "${google_project.prod_project.project_id_base}-${var.environment}-etl-nat"
+  name                               = "${var.project_id_base}-${var.environment}-etl-nat"
   project                            = google_project.prod_project.project_id
   router                             = google_compute_router.etl_router.name
   region                             = var.region
@@ -171,7 +171,7 @@ resource "google_compute_router_nat" "etl_nat" {
 
 # VPC Connector for Cloud Run
 resource "google_vpc_access_connector" "etl_connector" {
-  name          = "${google_project.prod_project.project_id_base}-${var.environment}-vpc-conn"
+  name          = "${var.project_id_base}-${var.environment}-vpc-conn"
   project       = google_project.prod_project.project_id
   region        = var.region
   network       = google_compute_network.etl_vpc.id
@@ -188,7 +188,7 @@ resource "google_vpc_access_connector" "etl_connector" {
 
 # Firewall rule: Allow outbound HTTPS traffic to external URLs
 resource "google_compute_firewall" "allow_egress_https" {
-  name    = "${google_project.prod_project.project_id_base}-${var.environment}-allow-egress-https"
+  name    = "${var.project_id_base}-${var.environment}-allow-egress-https"
   project = google_project.prod_project.project_id
   network = google_compute_network.etl_vpc.name
 
@@ -208,7 +208,7 @@ resource "google_compute_firewall" "allow_egress_https" {
 
 # Firewall rule: Allow internal communication within VPC
 resource "google_compute_firewall" "allow_internal" {
-  name    = "${google_project.prod_project.project_id_base}-${var.environment}-allow-internal"
+  name    = "${var.project_id_base}-${var.environment}-allow-internal"
   project = google_project.prod_project.project_id
   network = google_compute_network.etl_vpc.name
 
@@ -481,7 +481,7 @@ resource "google_cloud_run_v2_service" "etl_runner" {
 
 resource "google_artifact_registry_repository" "etl_images" {
   location      = var.region
-  repository_id = "${google_project.prod_project.project_id_base}-${var.environment}-etl-images"
+  repository_id = "${var.project_id_base}-${var.environment}-etl-images"
   description   = "Container images for ETL jobs"
   format        = "DOCKER"
   project       = google_project.prod_project.project_id
