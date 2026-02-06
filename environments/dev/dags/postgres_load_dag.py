@@ -2,6 +2,7 @@
 DAG for Load Layer - PostgreSQL Load
 Handles: --taxi-type
 """
+
 import os
 from datetime import datetime, timedelta
 from airflow import DAG
