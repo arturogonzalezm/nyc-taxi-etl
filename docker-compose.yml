@@ -2,7 +2,7 @@ x-airflow-common: &airflow-common
   image: apache/airflow:2.10.4-python3.12
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@bigquery:5432/${POSTGRES_DB}
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
@@ -10,7 +10,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
     PROJECT_ID_BASE: ${PROJECT_ID_BASE:-nyc-taxi-etl}
-    POSTGRES_HOST: postgres
+    POSTGRES_HOST: bigquery
     POSTGRES_PORT: 5432
     POSTGRES_USER: ${POSTGRES_USER}
     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,10 +21,10 @@ x-airflow-common: &airflow-common
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp-credentials.json
     CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /opt/airflow/gcp-credentials.json
   volumes:
-    - ./dev/dags:/opt/airflow/dags
+    - ./environments/dev/dags:/opt/airflow/dags
     - ${HOME}/.config/gcloud/application_default_credentials.json:/opt/airflow/gcp-credentials.json:ro
-    - ./dev/etl:/opt/airflow/etl
-    - ./dev:/opt/airflow/dev
+    - ./environments/dev/etl:/opt/airflow/etl
+    - ./environments/dev:/opt/airflow/environments/dev
     - airflow_logs:/opt/airflow/logs
     - /var/run/docker.sock:/var/run/docker.sock
   depends_on:
@@ -33,7 +33,7 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-postgres
+    container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-bigquery
     ports:
       - "5432:5432"
     environment:
@@ -42,7 +42,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./sql/postgres:/docker-entrypoint-initdb.d
+      - ./sql/bigquery:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -51,10 +51,10 @@ services:
   etl:
     build:
       context: .
-      dockerfile: dev/etl/Dockerfile
+      dockerfile: environments/dev/etl/Dockerfile
     container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-etl
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: bigquery
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -67,8 +67,8 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./dev/etl:/app/etl
-      - ./dev:/app/dev
+      - ./environments/dev/etl:/app/etl
+      - ./environments/dev:/app/environments/dev
       - ./terraform:/app/terraform:ro
       - ${HOME}/.config/gcloud/application_default_credentials.json:/app/gcp-credentials.json:ro
   airflow-init:
@@ -76,7 +76,7 @@ services:
     container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-airflow-init
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@bigquery:5432/${POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'

@@ -32,13 +32,13 @@ jobs:
         run: pip install ".[dev]"
 
       - name: Check code formatting with Black
-        run: black dev/etl/ tests/ --check --diff
+        run: black environments/dev/etl/jobs/ tests/ --check --diff
 
       - name: Lint with flake8
-        run: flake8 dev/etl/ --max-line-length=100 --ignore=E501,W503
+        run: flake8 environments/dev/etl/jobs/ --max-line-length=100 --ignore=E501,W503
 
       - name: Lint with pylint
-        run: pylint dev/etl/ --disable=C0111,R0903,C0103 || true
+        run: pylint environments/dev/etl/jobs/ --disable=C0111,R0903,C0103 || true
 
   # =============================================================================
   # STAGE 2: Validate Terraform
@@ -115,7 +115,7 @@ jobs:
         run: pip install ".[dev]"
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --cov=dev/etl --cov=tests --cov-report=xml --cov-report=term
+        run: pytest tests/ -v --cov=environments/dev/etl --cov=tests --cov-report=xml --cov-report=term
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -147,10 +147,10 @@ jobs:
 
       - name: Verify ETL module imports
         run: |
-          python -c "from dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob; print('✓ Bronze ingestion module OK')"
-          python -c "from dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob; print('✓ Gold transformation module OK')"
-          python -c "from dev.etl.jobs.load.postgres_load_job import PostgresLoadJob; print('✓ Postgres load module OK')"
-          python -c "from dev.etl.jobs.misc.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Zone lookup module OK')"
+          python -c "from environments.dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob; print('✓ Bronze ingestion module OK')"
+          python -c "from environments.dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob; print('✓ Gold transformation module OK')"
+          python -c "from environments.dev.etl.jobs.load.postgres_load_job import PostgresLoadJob; print('✓ Postgres load module OK')"
+          python -c "from environments.dev.etl.jobs.misc.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Zone lookup module OK')"
         env:
           GCS_BUCKET: test-bucket
           GCP_PROJECT_ID: test-project

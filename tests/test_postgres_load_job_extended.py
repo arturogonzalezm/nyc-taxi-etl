@@ -13,9 +13,9 @@ Tests cover:
 import pytest
 from unittest.mock import patch, MagicMock
 
-from dev.etl.jobs.load.postgres_load_job import PostgresLoadJob, run_postgres_load
-from dev.etl.jobs.base_job import JobExecutionError
-from dev.etl.jobs.utils.config import JobConfig
+from environments.dev.etl.jobs.load.postgres_load_job import PostgresLoadJob, run_postgres_load
+from environments.dev.etl.jobs.base_job import JobExecutionError
+from environments.dev import JobConfig
 
 
 class TestPostgresLoadJobExtract:
@@ -62,7 +62,7 @@ class TestPostgresLoadJobExtract:
 
         assert "fact_trip" in result
 
-    @patch("dev.etl.jobs.load.postgres_load_job.F")
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.F")
     def test_extract_applies_year_filter(self, mock_F):
         """Test extract applies year filter to fact table."""
         job = PostgresLoadJob("yellow", year=2024)
@@ -79,7 +79,7 @@ class TestPostgresLoadJobExtract:
         # Verify filter was called (for year)
         mock_df.filter.assert_called()
 
-    @patch("dev.etl.jobs.load.postgres_load_job.F")
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.F")
     def test_extract_applies_year_and_month_filter(self, mock_F):
         """Test extract applies both year and month filters."""
         job = PostgresLoadJob("yellow", year=2024, month=6)
@@ -141,7 +141,7 @@ class TestPostgresLoadJobTransform:
         """Reset JobConfig singleton after each test."""
         JobConfig.reset()
 
-    @patch("dev.etl.jobs.load.postgres_load_job.F")
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.F")
     def test_transform_adds_metadata_columns(self, mock_F):
         """Test transform adds load metadata columns."""
         job = PostgresLoadJob("yellow")
@@ -165,7 +165,7 @@ class TestPostgresLoadJobTransform:
         assert "dim_payment" in result
         assert "fact_trip" in result
 
-    @patch("dev.etl.jobs.load.postgres_load_job.F")
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.F")
     def test_transform_calls_withColumn_for_metadata(self, mock_F):
         """Test transform calls withColumn for each metadata field."""
         job = PostgresLoadJob("yellow")
@@ -182,7 +182,7 @@ class TestPostgresLoadJobTransform:
         # postgres_load_date, load_job_name
         assert mock_df.withColumn.call_count >= 3
 
-    @patch("dev.etl.jobs.load.postgres_load_job.F")
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.F")
     def test_transform_preserves_all_tables(self, mock_F):
         """Test transform returns all input tables."""
         job = PostgresLoadJob("yellow")
@@ -539,7 +539,7 @@ class TestPostgresLoadJobIntegration:
         """Reset JobConfig singleton after each test."""
         JobConfig.reset()
 
-    @patch("dev.etl.jobs.load.postgres_load_job.F")
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.F")
     def test_full_job_flow_with_mocks(self, mock_F):
         """Test complete job flow with all methods mocked."""
         job = PostgresLoadJob("yellow", year=2024, month=6)
@@ -564,7 +564,7 @@ class TestPostgresLoadJobIntegration:
 
     def test_run_postgres_load_with_all_params(self):
         """Test run_postgres_load function with all parameters."""
-        with patch("dev.etl.jobs.load.postgres_load_job.PostgresLoadJob") as MockJob:
+        with patch("environments.dev.etl.jobs.load.postgres_load_job.PostgresLoadJob") as MockJob:
             mock_instance = MagicMock()
             mock_instance.run.return_value = True
             MockJob.return_value = mock_instance
@@ -608,7 +608,7 @@ class TestPostgresLoadJobEdgeCases:
 
         assert "fact_trip" in result
 
-    @patch("dev.etl.jobs.load.postgres_load_job.F")
+    @patch("environments.dev.etl.jobs.load.postgres_load_job.F")
     def test_transform_with_single_table(self, mock_F):
         """Test transform works with single table."""
         job = PostgresLoadJob("yellow")

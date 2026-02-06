@@ -5,14 +5,14 @@ Unit tests for TaxiIngestionJob.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from dev.etl.jobs.bronze.taxi_ingestion_job import (
+from environments.dev.etl.jobs.bronze.taxi_ingestion_job import (
     TaxiIngestionJob,
     DataValidationError,
     DownloadError,
     run_ingestion,
 )
-from dev.etl.jobs.base_job import JobExecutionError
-from dev.etl.jobs.utils.config import JobConfig
+from environments.dev.etl.jobs.base_job import JobExecutionError
+from environments.dev import JobConfig
 
 
 class TestDataValidationError:

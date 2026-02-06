@@ -265,11 +265,11 @@ The `.env` file contains configuration:
 
 ```bash
 # Project Configuration
-PROJECT_ID_BASE=nyc-taxi-etl  # Used for container naming (e.g., nyc-taxi-etl-etl, nyc-taxi-etl-postgres)
+PROJECT_ID_BASE=nyc-taxi-etl  # Used for container naming (e.g., nyc-taxi-etl-etl, nyc-taxi-etl-bigquery)
 
 # PostgreSQL Configuration
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
+POSTGRES_USER=bigquery
+POSTGRES_PASSWORD=bigquery
 POSTGRES_DB=nyc_taxi
 ```
 
@@ -286,10 +286,10 @@ POSTGRES_DB=nyc_taxi
 
 ```bash
 # Using make command
-make postgres-shell
+make bigquery-shell
 
 # Or directly with psql
-psql -h localhost -p 5432 -U postgres -d nyc_taxi
+psql -h localhost -p 5432 -U bigquery -d nyc_taxi
 
 # Sample queries
 SELECT COUNT(*) FROM taxi.fact_trip;

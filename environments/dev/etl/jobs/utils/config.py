@@ -1,0 +1,188 @@
+"""
+Configuration Management
+Centralized configuration for PySpark jobs using Singleton pattern.
+"""
+
+import os
+import tempfile
+from dataclasses import dataclass, field
+from typing import Literal, Optional
+from pathlib import Path
+
+from environments.dev.etl.jobs.utils.terraform_config import get_gcp_config_with_fallback
+
+
+def _get_bucket() -> str:
+    """Get GCS bucket from env var or terraform.tfvars."""
+    _, bucket = get_gcp_config_with_fallback()
+    return bucket
+
+
+def _get_project_id() -> str:
+    """Get GCP project ID from env var or terraform.tfvars."""
+    project_id, _ = get_gcp_config_with_fallback()
+    return project_id
+
+
+@dataclass
+class GCSConfig:
+    """
+    Google Cloud Storage configuration with environment variable support.
+
+    Configuration values are loaded with the following priority:
+    1. Environment variables (GCP_PROJECT_ID, GCS_BUCKET)
+    2. Computed from terraform/terraform.tfvars
+    """
+
+    bucket: str = field(default_factory=_get_bucket)
+    project_id: str = field(default_factory=_get_project_id)
+    bronze_path: str = "bronze/nyc_taxi"
+    silver_path: str = "silver/nyc_taxi"
+    gold_path: str = "gold/nyc_taxi"
+
+    def __post_init__(self):
+        """
+        Validate configuration after initialization.
+
+        :raises ValueError: If configuration validation fails
+        """
+        self._validate()
+
+    def _validate(self):
+        """
+        Validate all required configuration values.
+
+        :raises ValueError: If validation fails
+        """
+        errors = []
+
+        if not self.bucket:
+            errors.append(
+                "GCS_BUCKET not configured. Set via environment variable or "
+                "ensure terraform/terraform.tfvars exists with required variables."
+            )
+
+        if not self.project_id:
+            errors.append(
+                "GCP_PROJECT_ID not configured. Set via environment variable or "
+                "ensure terraform/terraform.tfvars exists with required variables."
+            )
+
+        if errors:
+            raise ValueError(
+                "Configuration validation failed:\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
+
+
+class JobConfig:
+    """
+    Singleton configuration for PySpark jobs.
+
+    This class follows the Singleton pattern to ensure consistent configuration
+    across all jobs in the same process. Uses lazy initialization and thread-safe
+    implementation.
+
+    Best practices implemented:
+    1. Singleton pattern for consistent configuration
+    2. Environment-based configuration (12-factor app)
+    3. System temp directory usage with proper cleanup
+    4. Validation on initialization
+    5. Immutable configuration after creation
+    """
+
+    _instance: Optional["JobConfig"] = None
+    _initialized: bool = False
+
+    def __new__(cls):
+        """
+        Singleton pattern: ensure only one instance exists
+
+        :returns Singleton instance
+        """
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        """
+        Initialise configuration (only once due to singleton)
+
+        :raises ValueError: If configuration validation fails
+        """
+        # Only initialize once
+        if JobConfig._initialized:
+            return
+
+        # Use system temp directory with app-specific subdirectory
+        # This is more efficient and follows OS best practices:
+        # - Respects OS temp directory settings ($TMPDIR, /tmp, etc.)
+        # - Automatically benefits from OS cleanup policies
+        # - Works across different platforms (Linux, macOS, Windows)
+        base_temp = Path(tempfile.gettempdir())
+        # Get project name from terraform config or environment
+        project_name = os.getenv("PROJECT_ID_BASE", "nyc-taxi-etl")
+        self._cache_dir = base_temp / project_name / "cache"
+
+        # Initialize GCS storage configuration
+        self._gcs = GCSConfig()
+
+        # Mark as initialized
+        JobConfig._initialized = True
+
+    @property
+    def cache_dir(self) -> Path:
+        """
+        Get cache directory path.
+
+        Returns Path object for better path manipulation and OS compatibility.
+        Creates directory if it doesn't exist (lazy creation).
+        """
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        return self._cache_dir
+
+    @property
+    def gcs(self) -> GCSConfig:
+        """Get GCS configuration (immutable)"""
+        return self._gcs
+
+    def get_storage_path(
+        self,
+        layer: Literal["bronze", "silver", "gold"],
+        taxi_type: Optional[str] = None,
+    ) -> str:
+        """
+        Get GCS storage path for given layer and taxi type.
+
+        :param layer: Data lake layer (bronze, silver, gold)
+        :param taxi_type: Type of taxi (yellow, green) - optional
+        :returns Full GCS storage path (gs://)
+        :raises ValueError: If layer is invalid
+
+        Examples:
+            >>> config = JobConfig()
+            >>> config.get_storage_path("bronze", "yellow")
+            'gs://<GCS_BUCKET>/bronze/nyc_taxi/yellow'
+        """
+        try:
+            layer_path = getattr(self._gcs, f"{layer}_path")
+        except AttributeError:
+            raise ValueError(
+                f"Invalid layer: {layer}. Must be one of: bronze, silver, gold"
+            )
+        base_path = f"gs://{self._gcs.bucket}/{layer_path}"
+
+        if taxi_type:
+            return f"{base_path}/{taxi_type}"
+        return base_path
+
+    @classmethod
+    def reset(cls):
+        """
+        Reset singleton instance (primarily for testing).
+
+        This allows tests to create fresh configurations without
+        interference from previous test runs.
+        """
+        cls._instance = None
+        cls._initialized = False

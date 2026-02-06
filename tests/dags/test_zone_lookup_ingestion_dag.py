@@ -11,7 +11,7 @@ class TestZoneLookupIngestionDag:
     @pytest.fixture
     def dag(self):
         """Load the DAG for testing."""
-        from dev.dags.zone_lookup_ingestion_dag import dag
+        from environments.dev.dags.zone_lookup_ingestion_dag import dag
 
         return dag
 
@@ -77,7 +77,7 @@ class TestZoneLookupIngestionDag:
     def test_ingest_task_bash_command_contains_module(self, dag):
         """Test bash command references correct module."""
         task = dag.get_task("ingest_zone_lookup")
-        assert "dev.etl.jobs.misc.zone_lookup_ingestion_job" in task.bash_command
+        assert "environments.dev.etl.jobs.misc.zone_lookup_ingestion_job" in task.bash_command
 
     def test_ingest_task_bash_command_no_params(self, dag):
         """Test bash command has no parameter placeholders."""

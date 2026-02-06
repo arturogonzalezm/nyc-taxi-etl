@@ -163,7 +163,7 @@ python -m dev.etl.jobs.load.postgres_load_job --taxi-type yellow --year 2024 --m
 
 ```bash
 # Connect to PostgreSQL
-make postgres-shell
+make bigquery-shell
 
 # Sample queries
 SELECT COUNT(*) FROM taxi.fact_trip;

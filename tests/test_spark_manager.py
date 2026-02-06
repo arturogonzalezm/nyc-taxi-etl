@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 import os
 
-from dev.etl.jobs.utils.spark_manager import SparkSessionManager, SparkSessionError
+from environments.dev.etl.jobs.utils.spark_manager import SparkSessionManager, SparkSessionError
 
 
 class TestSparkSessionError:

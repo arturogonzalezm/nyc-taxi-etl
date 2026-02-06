@@ -1,8 +1,8 @@
 import pytest
 
-from dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob
-from dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob
-from dev.etl.jobs.load.postgres_load_job import PostgresLoadJob
+from environments.dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob
+from environments.dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob
+from environments.dev.etl.jobs.load.postgres_load_job import PostgresLoadJob
 
 
 def test_taxi_ingestion_validate_parameters_valid():
