@@ -6,11 +6,12 @@
 
 # NYC Taxi Data Pipeline
 
-A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Commission (TLC) trip data. The pipeline implements a medallion architecture (Bronze/Gold layers) with a dimensional model, using Google Cloud Storage (GCS) for data lake storage and PostgreSQL for analytics.
+A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Commission (TLC) trip data. The pipeline implements a medallion architecture (Bronze/Gold layers) with a dimensional model, supporting both local development (PostgreSQL) and cloud production (BigQuery) environments.
 
 ## Table of Contents
 
 - [Architecture](#architecture)
+- [Environments](#environments)
 - [Infrastructure](#infrastructure)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
@@ -21,32 +22,51 @@ A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Comm
 ### Additional Documentation
 
 - [Architecture Diagram](docs/1.ARCHITECTURE.md)
-- [Dataset explanation](docs/2.DATASET.md)
-- [Data model and schema (fact + dims)](docs/3.DATA_MODEL.md)
+- [Dataset Explanation](docs/2.DATASET.md)
+- [Data Model and Schema](docs/3.DATA_MODEL.md)
 - [Historical Strategy](docs/4.HISTORICAL_STRATEGY.md)
-- [How to run locally (Docker)](docs/5.LOCAL_SETUP.md)
-- [How Terraform is structured](docs/6.TERRAFORM.md)
-- [Limitations and what you would improve next](docs/7.LIMITATIONS_IMPROVEMENTS.md)
+- [Local Setup Guide](docs/5.LOCAL_SETUP.md)
+- [Terraform Infrastructure](docs/6.TERRAFORM.md)
+- [Limitations and Improvements](docs/7.LIMITATIONS_IMPROVEMENTS.md)
 - [Authentication Guide](docs/8.AUTHENTICATION.md)
 
 ## Architecture
 
-The pipeline follows a medallion architecture with three layers:
+The pipeline follows a medallion architecture with two deployment environments:
 
 ```mermaid
-sequenceDiagram
-    participant NYC as NYC TLC API
-    participant Bronze as Bronze Layer
-    participant Gold as Gold Layer
-    participant PG as PostgreSQL
+flowchart TB
+    subgraph Source["Data Source"]
+        NYC["NYC TLC API"]
+    end
 
-    NYC->>Bronze: Download parquet files
-    Note over Bronze: Raw data + metadata<br/>(record_hash, timestamps)
-    Bronze->>Gold: Transform & validate
-    Note over Gold: Dimensional model<br/>(dim_date, dim_location, etc.)
-    Gold->>PG: Load star schema
-    Note over PG: fact_trip + dimensions<br/>(idempotent upsert)
+    subgraph GCS["Google Cloud Storage"]
+        Bronze["Bronze Layer"]
+        Gold["Gold Layer"]
+    end
+
+    subgraph Dev["Development"]
+        DevPG["PostgreSQL"]
+    end
+
+    subgraph Prod["Production"]
+        BQ["BigQuery"]
+    end
+
+    NYC --> Bronze --> Gold
+    Gold --> DevPG
+    Gold --> BQ
 ```
+
+### Environment Comparison
+
+| Aspect | Development | Production |
+|--------|-------------|------------|
+| **Orchestration** | Local Airflow (Docker) | Cloud Composer |
+| **ETL Execution** | Local PySpark | Cloud Run |
+| **Data Warehouse** | PostgreSQL | BigQuery |
+| **Data Lake** | GCS | GCS |
+| **Branch** | `develop/*` | `main` |
 
 ### Layer Overview
 
@@ -54,45 +74,102 @@ sequenceDiagram
 |-------|---------|---------|
 | Bronze | Raw data ingestion with metadata columns | GCS |
 | Gold | Dimensional model with data quality checks | GCS |
-| Load | Star schema for analytics | PostgreSQL |
+| Load | Star schema for analytics | PostgreSQL (dev) / BigQuery (prod) |
 
-### Storage Backends
+## Environments
 
-The pipeline supports two storage backends:
+The project supports two environments with separate code paths:
 
-| Backend | Use Case | Configuration |
-|---------|----------|---------------|
-| **Google Cloud Storage (GCS)** | Data Lake for Bronze/Gold layers | `STORAGE_BACKEND=gcs` |
+```
+environments/
+├── dev/                              # Development environment
+│   ├── dags/                         # Airflow DAGs
+│   │   ├── taxi_ingestion_dag.py
+│   │   ├── taxi_gold_dag.py
+│   │   ├── postgres_load_dag.py
+│   │   └── zone_lookup_ingestion_dag.py
+│   ├── etl/jobs/                     # ETL jobs
+│   │   ├── bronze/                   # Ingestion jobs
+│   │   ├── gold/                     # Transformation jobs
+│   │   ├── load/                     # PostgreSQL loader
+│   │   └── utils/                    # Config, Spark manager
+│   └── sql/postgres/                 # PostgreSQL DDL
+│
+└── prod/                             # Production environment
+    ├── dags/                         # Airflow DAGs
+    │   ├── taxi_ingestion_dag.py
+    │   ├── taxi_gold_dag.py
+    │   ├── bigquery_load_dag.py
+    │   └── zone_lookup_ingestion_dag.py
+    ├── etl/jobs/                     # ETL jobs
+    │   ├── bronze/                   # Ingestion jobs
+    │   ├── gold/                     # Transformation jobs
+    │   ├── load/                     # BigQuery loader
+    │   └── utils/                    # Config, Spark manager
+    └── sql/bigquery/                 # BigQuery DDL
+```
 
 ## Infrastructure
 
-The project includes Terraform configuration for automated GCP infrastructure provisioning:
+The project uses Terraform for GCP infrastructure provisioning:
 
-- **GCP Project** with billing configuration
-- **Service Account** for pipeline operations
-- **GCS Bucket** for data lake storage (pattern: `${project_id_base}-${environment}-gcs-${region}-${instance_number}`)
-- **Workload Identity Federation** for secure GitHub Actions authentication
-- **IAM Roles** for storage and BigQuery access
+```
+terraform/
+└── environments/
+    ├── dev/                          # Development infrastructure
+    │   ├── main.tf                   # GCP Project, APIs, Service Accounts
+    │   ├── variables.tf              # Variable definitions
+    │   ├── providers.tf              # Provider configuration
+    │   ├── outputs.tf                # Output values
+    │   └── config.tfvars             # Non-sensitive configuration
+    │
+    └── prod/                         # Production infrastructure
+        ├── main.tf                   # Cloud Composer, Cloud Run, BigQuery
+        ├── variables.tf              # Variable definitions
+        ├── providers.tf              # Provider configuration
+        ├── outputs.tf                # Output values
+        └── config.tfvars             # Non-sensitive configuration
+```
 
-See [Terraform Infrastructure](docs/6.TERRAFORM.md) for detailed infrastructure documentation.
+### Infrastructure by Environment
 
-### CI/CD Workflows
+| Resource | Development | Production |
+|----------|-------------|------------|
+| **GCP Project** | ✓ | ✓ |
+| **GCS Bucket** | ✓ | ✓ |
+| **Service Accounts** | Pipeline SA, Airflow SA | Composer SA, Cloud Run SA, ETL SA |
+| **Workload Identity** | ✓ | ✓ |
+| **Cloud Composer** | - | ✓ |
+| **Cloud Run** | - | ✓ |
+| **BigQuery** | - | ✓ |
+| **VPC + NAT** | - | ✓ |
+| **Artifact Registry** | - | ✓ |
 
-| Workflow | Trigger | Purpose |
-|----------|---------|----------|
-| `ci.yml` | PR to main/develop | Linting, tests, security scan |
-| `deploy.yml` | Push to main | Deploy Terraform infrastructure |
-| `destroy.yml` | Manual | Destroy infrastructure |
+See [Terraform Infrastructure](docs/6.TERRAFORM.md) for detailed documentation.
+
+### CI/CD Pipeline
+
+```mermaid
+flowchart LR
+    PR["Pull Request"] --> Validate["Stages 1-5:<br/>Lint, Test, Scan"]
+    Dev["Push develop/*"] --> Validate --> DeployDev["Stage 6:<br/>Deploy Dev"]
+    Main["Push main"] --> Validate --> DeployProd["Stage 7:<br/>Deploy Prod"]
+```
+
+| Stage | Trigger | Purpose |
+|-------|---------|---------|
+| 1-5 | All PRs/pushes | Linting, Terraform validate, security scan, tests |
+| 6 | Push to `develop/*` | Deploy dev Terraform infrastructure |
+| 7 | Push to `main` | Deploy prod infrastructure, build container, deploy DAGs |
 
 ---
 
 ## Prerequisites
 
 - Python 3.12+
-- Docker Desktop (for PostgreSQL in local development)
+- Docker Desktop (for local development)
 - Java 17+ (for PySpark)
-- Apache Spark 4.1.1
-- Google Cloud SDK (for GCS deployments)
+- Google Cloud SDK
 - Terraform 1.5.0
 
 ## Quick Start
@@ -103,12 +180,6 @@ See [Terraform Infrastructure](docs/6.TERRAFORM.md) for detailed infrastructure 
 git clone https://github.com/arturogonzalezm/nyc-taxi-etl
 cd nyc-taxi-etl
 
-# For dev env and run locally switch to develop/gcp-organisation branch
-git checkout develop/gcp-organisation
-
-# For prod env and run in GCP switch to main branch
-git checkout main
-
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
@@ -117,58 +188,76 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install ".[dev]"
 ```
 
-### 2. GCP Infrastructure
+### 2. Choose Your Environment
+
+**For Development (local Docker + PostgreSQL):**
 
 ```bash
-# Generate .env and terraform.tfvars from config
-./scripts/generate-env.sh
+# Switch to develop branch
+git checkout develop
 
-# Provision GCP project, service accounts, and GCS bucket
-cd terraform
-terraform init
-terraform apply
-cd ..
-```
-
-### 3. Authenticate and Start
-
-```bash
-# Set up GCP authentication (service account impersonation)
+# Set up GCP authentication
 make setup
 
-# Start all services (PostgreSQL + Airflow)
+# Start all services
 make up
 ```
 
-Services available:
+**For Production (Cloud Composer + BigQuery):**
 
-- Airflow UI: [http://localhost:8080](http://localhost:8080) (admin/admin)
-- PostgreSQL: localhost:5432
+```bash
+# Switch to main branch
+git checkout main
+
+# Deploy via CI/CD (push to main triggers deployment)
+git push origin main
+```
+
+### 3. Access Services (Development)
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Airflow UI | http://localhost:8080 | admin / admin |
+| PostgreSQL | localhost:5432 | postgres / postgres |
 
 ### 4. Run the Pipeline
 
-Trigger DAGs from the Airflow UI, or run manually:
+**Via Airflow UI:** Enable DAGs in the Airflow web interface.
+
+**Via Command Line (Development):**
 
 ```bash
-# Ingest a single month of yellow taxi data
-python -m dev.etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --month 1
+# Ingest taxi data
+python -m environments.dev.etl.jobs.bronze.taxi_ingestion_job \
+    --taxi-type yellow --year 2024 --month 1
 
 # Transform to dimensional model
-python -m dev.etl.jobs.gold.taxi_gold_job --taxi-type yellow --year 2024 --month 1
+python -m environments.dev.etl.jobs.gold.taxi_gold_job \
+    --taxi-type yellow --year 2024 --month 1
 
 # Load to PostgreSQL
-python -m dev.etl.jobs.load.postgres_load_job --taxi-type yellow --year 2024 --month 1
+python -m environments.dev.etl.jobs.load.postgres_load_job \
+    --taxi-type yellow --year 2024 --month 1
 ```
 
 ### 5. Query the Data
 
+**Development (PostgreSQL):**
+
 ```bash
-# Connect to PostgreSQL
-make bigquery-shell
+make postgres-shell
 
 # Sample queries
 SELECT COUNT(*) FROM taxi.fact_trip;
 SELECT * FROM taxi.dim_location LIMIT 10;
+```
+
+**Production (BigQuery):**
+
+```sql
+-- In BigQuery Console
+SELECT COUNT(*) FROM `project-id.taxi.fact_trip`;
+SELECT * FROM `project-id.taxi.dim_location` LIMIT 10;
 ```
 
 ### 6. Stop Services
@@ -181,82 +270,49 @@ make down
 
 ### Bronze Layer (Ingestion)
 
-Downloads raw parquet files from NYC TLC and stores them in GCS with metadata columns.
+Downloads raw parquet files from NYC TLC and stores them in GCS.
 
 ```bash
-# Single month
-python -m dev.etl.jobs.bronze.taxi_ingestion_job \
-    --taxi-type yellow \
-    --year 2024 \
-    --month 1
+# Development
+python -m environments.dev.etl.jobs.bronze.taxi_ingestion_job \
+    --taxi-type yellow --year 2024 --month 1
 
 # Bulk ingestion (date range)
-python -m dev.etl.jobs.bronze.taxi_ingestion_job \
+python -m environments.dev.etl.jobs.bronze.taxi_ingestion_job \
     --taxi-type yellow \
     --start-year 2023 --start-month 1 \
     --end-year 2023 --end-month 12
-
-# Green taxi data
-python -m dev.etl.jobs.bronze.taxi_ingestion_job \
-    --taxi-type green \
-    --year 2024 \
-    --month 1
 ```
 
 ### Zone Lookup (Reference Data)
 
-Ingests the taxi zone lookup CSV for location dimension.
-
 ```bash
-python -m dev.etl.jobs.misc.zone_lookup_ingestion_job
+python -m environments.dev.etl.jobs.misc.zone_lookup_ingestion_job
 ```
 
 ### Gold Layer (Transformation)
 
-Transforms bronze data into a dimensional model with data quality checks.
+Transforms bronze data into a dimensional model.
 
 ```bash
-# Single month
-python -m dev.etl.jobs.gold.taxi_gold_job \
-    --taxi-type yellow \
-    --year 2024 \
-    --month 1
-
-# Date range
-python -m dev.etl.jobs.gold.taxi_gold_job \
-    --taxi-type yellow \
-    --year 2023 --month 1 \
-    --end-year 2023 --end-month 6
+python -m environments.dev.etl.jobs.gold.taxi_gold_job \
+    --taxi-type yellow --year 2024 --month 1
 ```
 
-### Load Layer (PostgreSQL)
+### Load Layer
 
-Loads the dimensional model into PostgreSQL using idempotent upserts.
+**Development (PostgreSQL):**
 
 ```bash
-# Load all data for a taxi type
-python -m dev.etl.jobs.load.postgres_load_job --taxi-type yellow
-
-# Load specific month
-python -m dev.etl.jobs.load.postgres_load_job \
-    --taxi-type yellow \
-    --year 2024 \
-    --month 1
+python -m environments.dev.etl.jobs.load.postgres_load_job \
+    --taxi-type yellow --year 2024 --month 1
 ```
 
-### Safe Backfill
-
-For re-processing historical data without duplicates:
+**Production (BigQuery):**
 
 ```bash
-# Backfill specific months
-python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2023-03 2023-07
-
-# Backfill a range
-python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2023-01:2023-12
-
-# Skip deletion (keep existing data)
-python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2024-01 --no-delete
+python -m environments.prod.etl.jobs.load.bigquery_load_job \
+    --taxi-type yellow --year 2024 --month 1
 ```
 
 ## Makefile Commands
@@ -265,11 +321,12 @@ python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2024-01 --
 
 | Command | Description |
 |---------|-------------|
-| `make init` | Initialize directories and create `.env` from template |
+| `make init` | Initialize directories and create `.env` |
 | `make up` | Start all services (PostgreSQL + Airflow) |
 | `make down` | Stop all services |
 | `make logs` | Show service logs |
 | `make nuke` | Remove all containers, images, and volumes |
+| `make setup` | Configure GCP authentication |
 
 ### PostgreSQL
 
@@ -278,79 +335,65 @@ python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2024-01 --
 | `make postgres-start` | Start PostgreSQL container |
 | `make postgres-stop` | Stop PostgreSQL container |
 | `make postgres-shell` | Connect to PostgreSQL shell |
-| `make postgres-status` | Show PostgreSQL status and table counts |
+| `make postgres-status` | Show status and table counts |
 | `make postgres-create-tables` | Create dimensional model tables |
-| `make postgres-nuke` | Destroy and recreate PostgreSQL with fresh schema |
-
-### Help
-
-```bash
-make help
-```
-
-## Project Structure
-
-```
-nyc-taxi-etl/
-├── dev/                             # Development environment
-│   ├── dags/                        # Airflow DAGs
-│   │   ├── taxi_ingestion_dag.py    # Bronze layer ingestion DAG
-│   │   ├── taxi_gold_dag.py         # Gold layer transformation DAG
-│   │   ├── postgres_load_dag.py     # PostgreSQL load DAG
-│   │   └── zone_lookup_ingestion_dag.py  # Zone lookup ingestion DAG
-│   └── etl/
-│       ├── jobs/
-│       │   ├── base_job.py          # Abstract base class (Template Method pattern)
-│       │   ├── bronze/
-│       │   │   ├── taxi_ingestion_job.py           # NYC taxi data ingestion
-│       │   │   └── taxi_injection_safe_backfill_job.py  # Safe historical backfill
-│       │   ├── misc/
-│       │   │   └── zone_lookup_ingestion_job.py    # Zone lookup reference data
-│       │   ├── gold/
-│       │   │   └── taxi_gold_job.py # Dimensional model transformation
-│       │   ├── load/
-│       │   │   └── postgres_load_job.py # PostgreSQL loader
-│       │   └── utils/
-│       │       ├── config.py        # Configuration (Singleton pattern)
-│       │       └── spark_manager.py # Spark session management
-│       └── __init__.py
-├── terraform/                       # GCP infrastructure (Terraform)
-├── tests/                           # Unit tests (458+ tests, 54%+ coverage)
-├── sql/
-│   └── postgres/
-│       └── create_dimensional_model.sql  # PostgreSQL schema DDL
-├── docs/                            # Additional documentation
-├── docker-compose.yml               # PostgreSQL and Airflow services
-├── Makefile                         # Build automation
-├── pyproject.toml                   # Project configuration and dependencies
-└── README.md
-```
 
 ## Data Model
 
 ### Star Schema
 
-The gold layer produces a star schema with the following tables:
+The gold layer produces a star schema:
 
-![alt text](https://github.com/arturogonzalezm/nyc-taxi-etl/blob/main/docs/images/erd.png?raw=true)
+```mermaid
+erDiagram
+    fact_trip ||--o{ dim_date : "pickup_date_key"
+    fact_trip ||--o{ dim_date : "dropoff_date_key"
+    fact_trip ||--o{ dim_location : "pickup_location_id"
+    fact_trip ||--o{ dim_location : "dropoff_location_id"
+    fact_trip ||--o{ dim_payment : "payment_id"
 
-### Idempotent Loading
+    dim_date {
+        int date_key PK
+        date full_date
+        int year
+        int month
+        int day
+        string day_name
+    }
 
-The PostgreSQL loader uses hash-based upserts to ensure idempotency:
-- Each fact record has a `fact_hash` computed from business keys
-- Re-running the load job skips existing records
-- Safe to run multiple times without creating duplicates
+    dim_location {
+        int location_id PK
+        string borough
+        string zone
+        string service_zone
+    }
+
+    dim_payment {
+        int payment_id PK
+        int payment_type
+        string description
+    }
+
+    fact_trip {
+        string trip_id PK
+        string taxi_type
+        timestamp pickup_datetime
+        timestamp dropoff_datetime
+        decimal trip_distance
+        decimal total_amount
+    }
+```
+
+See [Data Model Documentation](docs/3.DATA_MODEL.md) for full schema details.
 
 ## Testing
-
-The project includes comprehensive unit tests with 458+ tests and 54%+ code coverage.
 
 ```bash
 # Run all tests
 pytest tests/ -v
 
 # Run with coverage
-pytest tests/ -v --cov=dev.etl --cov-report=term
+pytest tests/ -v --cov=environments --cov-report=term
 
 # Run specific test file
 pytest tests/test_base_job.py -v
@@ -360,26 +403,23 @@ pytest tests/test_base_job.py -v
 
 ```bash
 # Format code
-black dev/etl/ tests/
+black environments/ tests/
 
 # Lint
-flake8 dev/etl/ --max-line-length=100 --ignore=E501,W503
-pylint dev/etl/
+flake8 environments/ --max-line-length=100 --ignore=E501,W503
+pylint environments/
 ```
 
 ## Environment Variables
 
-Configure via environment variables or a secrets manager.
-
 ### Storage Configuration
 
-| Variable | Description | Default |
-|----------|-------------|----------|
-| `STORAGE_BACKEND` | Storage backend (`gcs`) | `gcs` |
-| `GCS_BUCKET` | GCS bucket name | Set via `.env` (pattern: `${project_id_base}-${environment}-gcs-${region}-${instance_number}`) |
-| `GCP_PROJECT_ID` | GCP project ID | Set via `.env` (pattern: `${project_id_base}-${environment}-${region}-${instance_number}`) |
+| Variable | Description |
+|----------|-------------|
+| `GCS_BUCKET` | GCS bucket name (auto-computed from config.tfvars) |
+| `GCP_PROJECT_ID` | GCP project ID (auto-computed from config.tfvars) |
 
-### Database Configuration
+### Database Configuration (Development)
 
 | Variable | Description |
 |----------|-------------|
@@ -389,7 +429,7 @@ Configure via environment variables or a secrets manager.
 | `POSTGRES_USER` | PostgreSQL user |
 | `POSTGRES_PASSWORD` | PostgreSQL password |
 
-> **Note:** Never commit credentials to version control. Use environment variables, secrets managers, or CI/CD secrets for production deployments.
+> **Note:** Configuration is automatically loaded from `terraform/environments/{dev,prod}/config.tfvars`. See [Authentication Guide](docs/8.AUTHENTICATION.md) for GCP setup.
 
 ---
 
