@@ -23,7 +23,9 @@ def parse_tfvars(tfvars_path: Optional[str] = None) -> dict:
         current_dir = Path(__file__).resolve().parent
         # Go up to project root (environments/dev/etl/jobs/utils -> project root)
         project_root = current_dir.parent.parent.parent.parent.parent
-        tfvars_path = project_root / "terraform" / "environments" / "dev" / "config.tfvars"
+        tfvars_path = (
+            project_root / "terraform" / "environments" / "dev" / "config.tfvars"
+        )
     else:
         tfvars_path = Path(tfvars_path)
 

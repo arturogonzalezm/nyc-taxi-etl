@@ -135,8 +135,7 @@ class SparkSessionManager:
                     )
                     .config(
                         "spark.jars.packages",
-                        "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.18,"
-                        "org.postgresql:postgresql:42.7.1",
+                        "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.18",
                     )
                 )
 
