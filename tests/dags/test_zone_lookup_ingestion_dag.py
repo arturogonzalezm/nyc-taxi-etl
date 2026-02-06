@@ -21,9 +21,7 @@ class TestZoneLookupIngestionDag:
 
     def test_dag_description(self, dag):
         """Test DAG has correct description."""
-        assert (
-            dag.description == "Ingest taxi zone lookup reference data to Misc layer"
-        )
+        assert dag.description == "Ingest taxi zone lookup reference data to Misc layer"
 
     def test_dag_schedule(self, dag):
         """Test DAG has no schedule (manual trigger only)."""
