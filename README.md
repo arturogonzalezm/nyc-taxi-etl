@@ -21,14 +21,14 @@ A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Comm
 
 ### Additional Documentation
 
-- [Architecture Diagram](docs/1.ARCHITECTURE.md)
-- [Dataset Explanation](docs/2.DATASET.md)
-- [Data Model and Schema](docs/3.DATA_MODEL.md)
-- [Historical Strategy](docs/4.HISTORICAL_STRATEGY.md)
-- [Local Setup Guide](docs/5.LOCAL_SETUP.md)
-- [Terraform Infrastructure](docs/6.TERRAFORM.md)
-- [Limitations and Improvements](docs/7.LIMITATIONS_IMPROVEMENTS.md)
-- [Authentication Guide](docs/8.AUTHENTICATION.md)
+1. [Architecture Diagram](docs/1.ARCHITECTURE.md)
+2. [Dataset Explanation](docs/2.DATASET.md)
+3. [Data Model and Schema](docs/3.DATA_MODEL.md)
+4. [Historical Strategy](docs/4.HISTORICAL_STRATEGY.md)
+5. [Local Setup Guide](docs/5.LOCAL_SETUP.md)
+6. [Terraform Infrastructure](docs/6.TERRAFORM.md)
+7. [Limitations and Improvements](docs/7.LIMITATIONS_IMPROVEMENTS.md)
+8. [Authentication Guide](docs/8.AUTHENTICATION.md)
 
 ## Architecture
 
