@@ -27,7 +27,7 @@ with DAG(
     schedule=None,
     start_date=datetime(2024, 1, 1),
     catchup=False,
-    tags=["load", "postgres", "taxi"],
+    tags=["load", "bigquery", "taxi"],
     params={
         "taxi_type": "yellow",
     },

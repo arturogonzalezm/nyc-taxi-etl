@@ -37,7 +37,7 @@ class TestPostgresLoadDag:
 
     def test_dag_tags(self, dag):
         """Test DAG has correct tags."""
-        assert set(dag.tags) == {"load", "postgres", "taxi"}
+        assert set(dag.tags) == {"load", "bigquery", "taxi"}
 
     def test_dag_default_args_owner(self, dag):
         """Test default args owner."""

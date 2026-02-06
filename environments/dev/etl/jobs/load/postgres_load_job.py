@@ -94,8 +94,8 @@ class PostgresLoadJob(BaseSparkJob):
         :params year: Optional year filter (loads all if not specified)
         :params month: Optional month filter (loads all if not specified)
         :params postgres_url: PostgreSQL JDBC URL (defaults to env var or localhost)
-        :params postgres_user: PostgreSQL username (defaults to env var or 'postgres')
-        :params postgres_password: PostgreSQL password (defaults to env var or 'postgres')
+        :params postgres_user: PostgreSQL username (defaults to env var or 'bigquery')
+        :params postgres_password: PostgreSQL password (defaults to env var or 'bigquery')
         :params config: Optional job configuration
         :raises ValueError: If parameters are invalid
         """
@@ -118,9 +118,9 @@ class PostgresLoadJob(BaseSparkJob):
         default_db = os.getenv("POSTGRES_DB", "nyc_taxi")
         default_url = f"jdbc:postgresql://{default_host}:{default_port}/{default_db}"
         self.postgres_url = postgres_url or os.getenv("POSTGRES_URL", default_url)
-        self.postgres_user = postgres_user or os.getenv("POSTGRES_USER", "postgres")
+        self.postgres_user = postgres_user or os.getenv("POSTGRES_USER", "bigquery")
         self.postgres_password = postgres_password or os.getenv(
-            "POSTGRES_PASSWORD", "postgres"
+            "POSTGRES_PASSWORD", "bigquery"
         )
 
         # JDBC connection properties for optimized loading
@@ -697,9 +697,9 @@ if __name__ == "__main__":
     )
     parser.add_argument("--year", type=int, help="Year filter (optional)")
     parser.add_argument("--month", type=int, help="Month filter (optional)")
-    parser.add_argument("--postgres-url", type=str, help="PostgreSQL JDBC URL")
-    parser.add_argument("--postgres-user", type=str, help="PostgreSQL username")
-    parser.add_argument("--postgres-password", type=str, help="PostgreSQL password")
+    parser.add_argument("--bigquery-url", type=str, help="PostgreSQL JDBC URL")
+    parser.add_argument("--bigquery-user", type=str, help="PostgreSQL username")
+    parser.add_argument("--bigquery-password", type=str, help="PostgreSQL password")
 
     args = parser.parse_args()
 

@@ -28,10 +28,10 @@ x-airflow-common: &airflow-common
     - airflow_logs:/opt/airflow/logs
     - /var/run/docker.sock:/var/run/docker.sock
   depends_on:
-    postgres:
+    bigquery:
       condition: service_healthy
 services:
-  postgres:
+  bigquery:
     image: postgres:15-alpine
     container_name: ${PROJECT_ID_BASE:-nyc-taxi-etl}-bigquery
     ports:
@@ -64,7 +64,7 @@ services:
       GCS_IMPERSONATE_SA: ${GCS_IMPERSONATE_SA:-}
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
     depends_on:
-      postgres:
+      bigquery:
         condition: service_healthy
     volumes:
       - ./environments/dev/etl:/app/etl

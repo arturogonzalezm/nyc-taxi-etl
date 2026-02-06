@@ -42,13 +42,13 @@ RUN curl -L --retry 3 --retry-delay 5 -o /opt/spark/jars/gcs-connector-hadoop3-2
     https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.25.jar
 
 # Copy project files
-COPY dev/ ./dev/
+COPY environments/dev/ ./environments/dev/
 
 # Install package in editable mode (fast, deps already installed)
 RUN pip install --no-cache-dir --no-deps -e .
 
 # Set Python path
-ENV PYTHONPATH=/app:/app/dev
+ENV PYTHONPATH=/app:/app/environments/dev
 
 # Keep container running for development
 CMD ["tail", "-f", "/dev/null"]
