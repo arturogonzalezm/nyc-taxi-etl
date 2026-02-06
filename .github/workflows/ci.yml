@@ -1,108 +1,107 @@
-name: CI Pipeline
+name: CI/CD Pipeline for GCP
 
 run-name: ${{ github.event.head_commit.message || github.event.pull_request.title || github.ref_name }}
 
 on:
   push:
-    branches: [ develop, develop/* ]
+    branches: [main, develop, 'develop/*']
   pull_request:
-    branches: [ main, develop, develop/* ]
+    branches: [main, develop, 'develop/*']
+
+env:
+  TF_VERSION: '1.5.0'
+  WORKING_DIR: './terraform'
 
 jobs:
+  # =============================================================================
+  # STAGE 1: Linting and Code Format
+  # =============================================================================
   lint-and-format:
-    name: Linting and Code Format
+    name: 1. Linting and Code Format
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: |
-          pip install ".[dev]"
+        run: pip install ".[dev]"
 
-      - name: Check code formatting with Black
-        run: |
-          black etl/ tests/ --check --diff
+      - name: Check code formatting with Black (dev)
+        run: black environments/dev/etl/jobs/ tests/ --check --diff
 
-      - name: Lint with flake8
-        run: |
-          flake8 etl/ --max-line-length=100 --ignore=E501,W503
+      - name: Check code formatting with Black (prod)
+        run: black environments/prod/etl/jobs/ environments/prod/dags/ --check --diff
 
-      - name: Lint with pylint
-        run: |
-          pylint etl/ --disable=C0111,R0903,C0103 || true
+      - name: Lint with flake8 (dev)
+        run: flake8 environments/dev/etl/jobs/ --max-line-length=100 --ignore=E501,W503
 
-  test:
-    name: Unit Tests
+      - name: Lint with flake8 (prod)
+        run: flake8 environments/prod/etl/jobs/ environments/prod/dags/ --max-line-length=100 --ignore=E501,W503
+
+      - name: Lint with pylint (dev)
+        run: pylint environments/dev/etl/jobs/ --disable=C0111,R0903,C0103 || true
+
+      - name: Lint with pylint (prod)
+        run: pylint environments/prod/etl/jobs/ --disable=C0111,R0903,C0103 || true
+
+  # =============================================================================
+  # STAGE 2: Validate Terraform
+  # =============================================================================
+  terraform-validate:
+    name: 2. Validate Terraform
     runs-on: ubuntu-latest
+    needs: [lint-and-format]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
-          python-version: '3.12'
+          terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Install dependencies
-        run: |
-          pip install ".[dev]"
+      - name: Terraform Format Check (root)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform fmt -check -recursive
 
-      - name: Run tests with coverage
-        run: |
-          pytest tests/ -v --cov=etl --cov=tests --cov-report=xml --cov-report=term
+      - name: Terraform Init (root)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init -backend=false
 
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Terraform Validate (root)
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform validate
 
-  integration-test-local:
-    name: Local Integration Test
-    runs-on: ubuntu-latest
-    needs: [lint-and-format, test]
+      - name: Terraform Format Check (prod)
+        working-directory: ./terraform/environments/prod
+        run: terraform fmt -check
 
-    steps:
-      - uses: actions/checkout@v3
+      - name: Terraform Init (prod)
+        working-directory: ./terraform/environments/prod
+        run: terraform init -backend=false
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
+      - name: Terraform Validate (prod)
+        working-directory: ./terraform/environments/prod
+        run: terraform validate
 
-      - name: Install dependencies
-        run: |
-          pip install .
-
-      - name: Create test data directories
-        run: |
-          mkdir -p data/bronze data/silver data/gold
-
-      - name: Verify ETL module imports
-        run: |
-          python -c "from etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob; print('✓ Bronze ingestion module OK')"
-          python -c "from etl.jobs.gold.taxi_gold_job import TaxiGoldJob; print('✓ Gold transformation module OK')"
-          python -c "from etl.jobs.load.postgres_load_job import PostgresLoadJob; print('✓ Postgres load module OK')"
-          python -c "from etl.jobs.bronze.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Zone lookup module OK')"
-        env:
-          GCS_BUCKET: test-bucket
-          GCP_PROJECT_ID: test-project
-
+  # =============================================================================
+  # STAGE 3: Security Scan
+  # =============================================================================
   security-scan:
-    name: Security Scan
+    name: 3. Security Scan
     runs-on: ubuntu-latest
+    needs: [terraform-validate]
     permissions:
       security-events: write
       contents: read
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -116,3 +115,480 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
+
+  # =============================================================================
+  # STAGE 4: Unit Tests
+  # =============================================================================
+  unit-tests:
+    name: 4. Unit Tests
+    runs-on: ubuntu-latest
+    needs: [security-scan]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install ".[dev]"
+
+      - name: Run tests with coverage
+        run: pytest tests/ -v --cov=environments/dev/etl --cov=tests --cov-report=xml --cov-report=term --junitxml=junit.xml
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: junit.xml
+
+  # =============================================================================
+  # STAGE 5: Integration Tests
+  # =============================================================================
+  integration-tests:
+    name: 5. Integration Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install .
+
+      - name: Create test data directories
+        run: mkdir -p data/bronze data/silver data/gold
+
+      - name: Verify ETL module imports (dev)
+        run: |
+          python -c "from environments.dev.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob; print('✓ Bronze ingestion module OK')"
+          python -c "from environments.dev.etl.jobs.gold.taxi_gold_job import TaxiGoldJob; print('✓ Gold transformation module OK')"
+          python -c "from environments.dev.etl.jobs.load.postgres_load_job import PostgresLoadJob; print('✓ Postgres load module OK')"
+          python -c "from environments.dev.etl.jobs.misc.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Zone lookup module OK')"
+        env:
+          GCS_BUCKET: test-bucket
+          GCP_PROJECT_ID: test-project
+
+      - name: Verify ETL module imports (prod)
+        run: |
+          python -c "from environments.prod.etl.jobs.bronze.taxi_ingestion_job import TaxiIngestionJob; print('✓ Prod Bronze ingestion module OK')"
+          python -c "from environments.prod.etl.jobs.gold.taxi_gold_job import TaxiGoldJob; print('✓ Prod Gold transformation module OK')"
+          python -c "from environments.prod.etl.jobs.load.bigquery_load_job import BigQueryLoadJob; print('✓ Prod BigQuery load module OK')"
+          python -c "from environments.prod.etl.jobs.misc.zone_lookup_ingestion_job import ZoneLookupIngestionJob; print('✓ Prod Zone lookup module OK')"
+        env:
+          GCS_BUCKET: test-bucket
+          GCP_PROJECT_ID: test-project
+
+  # =============================================================================
+  # STAGE 6: Terraform Deploy (Development)
+  # =============================================================================
+  deploy-dev:
+    name: 6. Terraform Deploy Dev
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/develop/'))
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENVIRONMENT: 'dev'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load config from terraform.tfvars
+        id: config
+        run: |
+          # Parse terraform.tfvars and export as environment variables
+          while IFS='=' read -r key value; do
+            # Skip empty lines and comments
+            [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+            # Clean up key and value
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
+            # Export to GITHUB_ENV (uppercase key)
+            echo "${key^^}=$value" >> $GITHUB_ENV
+          done < terraform/config.tfvars
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: terraform init
+
+      - name: Import existing resources if needed
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+          SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
+
+          TF_VARS="-var-file=config.tfvars -var=billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }} -var=organisation_id=${{ secrets.GCP_ORGANISATION_ID }} -var=github_repository=${{ github.repository }} -var=environment=${{ env.ENVIRONMENT }}"
+
+          # Import project
+          if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+            terraform import $TF_VARS google_project.nyc_taxi_project "$PROJECT_ID" 2>/dev/null || true
+          fi
+
+          # Import service account
+          if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+            terraform import $TF_VARS google_service_account.nyc_taxi_sa "projects/${PROJECT_ID}/serviceAccounts/${SA_EMAIL}" 2>/dev/null || true
+          fi
+
+          # Import workload identity pool (requires project number, not project ID)
+          if gcloud iam workload-identity-pools describe github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
+            PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+            terraform import $TF_VARS google_iam_workload_identity_pool.github_pool "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool" 2>/dev/null || true
+          fi
+
+          # Import workload identity provider
+          if gcloud iam workload-identity-pools providers describe github-provider --workload-identity-pool=github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
+            PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+            terraform import $TF_VARS google_iam_workload_identity_pool_provider.github_provider "projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider" 2>/dev/null || true
+          fi
+
+          # Import GCS buckets
+          if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
+            terraform import $TF_VARS google_storage_bucket.nyc_taxi_etl "$BUCKET_DATA" 2>/dev/null || true
+          fi
+
+          if gsutil ls -b "gs://${BUCKET_STATE}" &>/dev/null; then
+            terraform import $TF_VARS google_storage_bucket.terraform_state "$BUCKET_STATE" 2>/dev/null || true
+          fi
+
+      - name: Terraform Plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          terraform plan \
+            -var-file=config.tfvars \
+            -var="billing_account_id=${{ secrets.GCP_BILLING_ACCOUNT_ID }}" \
+            -var="organisation_id=${{ secrets.GCP_ORGANISATION_ID }}" \
+            -var="github_repository=${{ github.repository }}" \
+            -var="environment=${{ env.ENVIRONMENT }}" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ${{ env.WORKING_DIR }}
+        id: apply-dev
+        continue-on-error: true
+        run: |
+          # Capture terraform apply output for analysis
+          terraform apply -auto-approve tfplan 2>&1 | tee terraform_apply.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Verify Infrastructure State
+        id: verify-infra-dev
+        run: |
+          PROJECT_ID="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${INSTANCE_NUMBER}"
+          SA_EMAIL="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-sa-${INSTANCE_NUMBER}@${PROJECT_ID}.iam.gserviceaccount.com"
+          BUCKET_DATA="${PROJECT_ID_BASE}-${{ env.ENVIRONMENT }}-${RESOURCE_TYPE}-${REGION}-${INSTANCE_NUMBER}"
+          BUCKET_STATE="${PROJECT_ID_BASE}-tfstate-${{ env.ENVIRONMENT }}"
+          
+          echo "============================================="
+          echo "Infrastructure Verification"
+          echo "============================================="
+          
+          INFRA_OK=true
+          
+          # Check Project
+          if gcloud projects describe "$PROJECT_ID" &>/dev/null; then
+            echo "✓ Project exists: $PROJECT_ID"
+          else
+            echo "✗ Project missing: $PROJECT_ID"
+            INFRA_OK=false
+          fi
+          
+          # Check Service Account
+          if gcloud iam service-accounts describe "$SA_EMAIL" --project="$PROJECT_ID" &>/dev/null; then
+            echo "✓ Service account exists: $SA_EMAIL"
+          else
+            echo "✗ Service account missing: $SA_EMAIL"
+            INFRA_OK=false
+          fi
+          
+          # Check Data Bucket
+          if gsutil ls -b "gs://${BUCKET_DATA}" &>/dev/null; then
+            echo "✓ Data bucket exists: $BUCKET_DATA"
+          else
+            echo "✗ Data bucket missing: $BUCKET_DATA"
+            INFRA_OK=false
+          fi
+          
+          # Check Terraform State Bucket
+          if gsutil ls -b "gs://${BUCKET_STATE}" &>/dev/null; then
+            echo "✓ State bucket exists: $BUCKET_STATE"
+          else
+            echo "✗ State bucket missing: $BUCKET_STATE"
+            INFRA_OK=false
+          fi
+          
+          # Check Workload Identity Pool
+          if gcloud iam workload-identity-pools describe github-actions-pool --location=global --project="$PROJECT_ID" &>/dev/null; then
+            echo "✓ Workload Identity Pool exists: github-actions-pool"
+          else
+            echo "✗ Workload Identity Pool missing: github-actions-pool"
+            INFRA_OK=false
+          fi
+          
+          echo "============================================="
+          
+          # Determine outcome based on terraform apply result and infra state
+          if [ "${{ steps.apply-dev.outcome }}" == "success" ]; then
+            echo "::notice::Terraform apply succeeded - infrastructure created/updated successfully"
+            echo "status=applied" >> $GITHUB_OUTPUT
+          elif [ "$INFRA_OK" == "true" ]; then
+            echo "::notice::Terraform apply had errors but all infrastructure exists - proceeding to next step"
+            echo "status=exists" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Terraform apply failed and critical infrastructure is missing"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  # =============================================================================
+  # STAGE 7: Deploy Production Environment
+  # =============================================================================
+  # This stage deploys the production environment infrastructure and application:
+  # 1. Terraform: Cloud Composer, Cloud Run, BigQuery, GCS, IAM
+  # 2. Build and push ETL container image to Artifact Registry
+  # 3. Deploy DAGs to Cloud Composer
+  # =============================================================================
+  deploy-prod:
+    name: 7. Deploy Production
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENVIRONMENT: 'prod'
+      PROD_TF_DIR: './terraform/environments/prod'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Load config from terraform.tfvars
+        id: config
+        run: |
+          # Parse root terraform.tfvars for base configuration
+          while IFS='=' read -r key value; do
+            [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+            key=$(echo "$key" | xargs)
+            value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
+            echo "${key^^}=$value" >> $GITHUB_ENV
+          done < terraform/config.tfvars
+          
+          # Set production-specific variables
+          echo "PROD_PROJECT_ID=${PROJECT_ID_BASE}-prod-${REGION}-${INSTANCE_NUMBER}" >> $GITHUB_ENV
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_PROD }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_PROD }}
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # =========================================================================
+      # STEP 1: Deploy Production Infrastructure with Terraform
+      # =========================================================================
+      - name: Terraform Init (Production)
+        working-directory: ${{ env.PROD_TF_DIR }}
+        run: terraform init
+
+      - name: Terraform Plan (Production)
+        working-directory: ${{ env.PROD_TF_DIR }}
+        run: |
+          terraform plan \
+            -var="project_id=${{ env.PROD_PROJECT_ID }}" \
+            -var="region=${{ env.REGION }}" \
+            -var="environment=prod" \
+            -var="project_id_base=${{ env.PROJECT_ID_BASE }}" \
+            -out=tfplan
+
+      - name: Terraform Apply (Production)
+        working-directory: ${{ env.PROD_TF_DIR }}
+        id: apply-prod
+        run: |
+          terraform apply -auto-approve tfplan 2>&1 | tee terraform_apply.log
+          
+          # Export Terraform outputs for subsequent steps
+          echo "COMPOSER_DAG_BUCKET=$(terraform output -raw composer_dag_gcs_prefix 2>/dev/null || echo '')" >> $GITHUB_ENV
+          echo "CLOUD_RUN_URL=$(terraform output -raw cloud_run_url 2>/dev/null || echo '')" >> $GITHUB_ENV
+          echo "ARTIFACT_REGISTRY_URL=$(terraform output -raw artifact_registry_url 2>/dev/null || echo '')" >> $GITHUB_ENV
+          echo "GCS_BUCKET=$(terraform output -raw gcs_bucket 2>/dev/null || echo '')" >> $GITHUB_ENV
+
+      # =========================================================================
+      # STEP 2: Build and Push ETL Container Image
+      # =========================================================================
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Push ETL Container
+        run: |
+          IMAGE_TAG="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:${{ github.sha }}"
+          IMAGE_LATEST="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:latest"
+          
+          echo "Building ETL container image..."
+          docker build \
+            -t "$IMAGE_TAG" \
+            -t "$IMAGE_LATEST" \
+            -f environments/prod/etl/Dockerfile \
+            .
+          
+          echo "Pushing ETL container image..."
+          docker push "$IMAGE_TAG"
+          docker push "$IMAGE_LATEST"
+          
+          echo "ETL_IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Update Cloud Run with new image
+        run: |
+          gcloud run services update nyc-taxi-etl-prod-etl-runner \
+            --image="${{ env.ETL_IMAGE_TAG }}" \
+            --region="${{ env.REGION }}" \
+            --project="${{ env.PROD_PROJECT_ID }}"
+
+      # =========================================================================
+      # STEP 3: Deploy DAGs to Cloud Composer
+      # =========================================================================
+      - name: Deploy DAGs to Cloud Composer
+        run: |
+          echo "Deploying DAGs to Cloud Composer..."
+          
+          # Extract bucket name from gs:// prefix path
+          DAG_BUCKET=$(echo "${{ env.COMPOSER_DAG_BUCKET }}" | sed 's|gs://||' | cut -d'/' -f1)
+          DAG_PATH=$(echo "${{ env.COMPOSER_DAG_BUCKET }}" | sed 's|gs://[^/]*/||')
+          
+          # Upload all production DAGs
+          for dag_file in environments/prod/dags/*.py; do
+            if [ -f "$dag_file" ] && [ "$(basename $dag_file)" != "__init__.py" ]; then
+              echo "Uploading $(basename $dag_file)..."
+              gsutil cp "$dag_file" "${{ env.COMPOSER_DAG_BUCKET }}/"
+            fi
+          done
+          
+          echo "✓ DAGs deployed successfully"
+
+      # =========================================================================
+      # STEP 4: Verify Production Deployment
+      # =========================================================================
+      - name: Verify Production Infrastructure
+        id: verify-infra-prod
+        run: |
+          echo "============================================="
+          echo "Production Infrastructure Verification"
+          echo "============================================="
+          
+          INFRA_OK=true
+          
+          # Check Cloud Composer
+          if gcloud composer environments describe nyc-taxi-etl-prod-composer \
+              --location=${{ env.REGION }} \
+              --project=${{ env.PROD_PROJECT_ID }} &>/dev/null; then
+            echo "✓ Cloud Composer environment exists"
+          else
+            echo "✗ Cloud Composer environment missing"
+            INFRA_OK=false
+          fi
+          
+          # Check Cloud Run service
+          if gcloud run services describe nyc-taxi-etl-prod-etl-runner \
+              --region=${{ env.REGION }} \
+              --project=${{ env.PROD_PROJECT_ID }} &>/dev/null; then
+            echo "✓ Cloud Run service exists"
+            echo "  URL: ${{ env.CLOUD_RUN_URL }}"
+          else
+            echo "✗ Cloud Run service missing"
+            INFRA_OK=false
+          fi
+          
+          # Check GCS bucket
+          if gsutil ls -b "gs://${{ env.GCS_BUCKET }}" &>/dev/null; then
+            echo "✓ GCS bucket exists: ${{ env.GCS_BUCKET }}"
+          else
+            echo "✗ GCS bucket missing"
+            INFRA_OK=false
+          fi
+          
+          # Check BigQuery dataset
+          if bq show --project_id=${{ env.PROD_PROJECT_ID }} taxi &>/dev/null; then
+            echo "✓ BigQuery dataset 'taxi' exists"
+          else
+            echo "✗ BigQuery dataset missing"
+            INFRA_OK=false
+          fi
+          
+          # Check Artifact Registry
+          if gcloud artifacts repositories describe nyc-taxi-etl-prod-etl-images \
+              --location=${{ env.REGION }} \
+              --project=${{ env.PROD_PROJECT_ID }} &>/dev/null; then
+            echo "✓ Artifact Registry repository exists"
+          else
+            echo "✗ Artifact Registry repository missing"
+            INFRA_OK=false
+          fi
+          
+          echo "============================================="
+          
+          if [ "$INFRA_OK" == "true" ]; then
+            echo "::notice::Production deployment successful - all infrastructure verified"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Production deployment incomplete - some infrastructure is missing"
+            echo "status=partial" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Production Deployment Summary
+        if: always()
+        run: |
+          echo "============================================="
+          echo "Production Deployment Summary"
+          echo "============================================="
+          echo "Environment: prod"
+          echo "Project ID: ${{ env.PROD_PROJECT_ID }}"
+          echo "Region: ${{ env.REGION }}"
+          echo "Commit: ${{ github.sha }}"
+          echo ""
+          echo "Resources:"
+          echo "  - Cloud Composer: nyc-taxi-etl-prod-composer"
+          echo "  - Cloud Run: ${{ env.CLOUD_RUN_URL }}"
+          echo "  - GCS Bucket: ${{ env.GCS_BUCKET }}"
+          echo "  - BigQuery Dataset: taxi"
+          echo "  - ETL Image: ${{ env.ETL_IMAGE_TAG }}"
+          echo "============================================="

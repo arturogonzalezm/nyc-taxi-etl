@@ -4,6 +4,42 @@ This directory contains Terraform configuration for provisioning Google Cloud Pl
 
 ---
 
+## Quick Start
+
+### For Organizations (Fully Automatic)
+
+If you have a GCP organization, everything can be deployed automatically via CI/CD:
+
+1. Create a service account with `roles/owner` at the organization level
+2. Set up Workload Identity Federation for GitHub Actions
+3. Add GitHub secrets and push - CI/CD handles the rest
+
+### For Individuals (No Organization)
+
+Run the bootstrap script once to set up the initial infrastructure:
+
+```bash
+cd terraform
+
+# Set required environment variables
+export BILLING_ACCOUNT_ID="XXXXXX-XXXXXX-XXXXXX"
+export GITHUB_REPOSITORY="owner/repo"
+
+# Run bootstrap (creates project, service account, state bucket, etc.)
+./bootstrap.sh dev   # For development environment
+./bootstrap.sh prod  # For production environment
+
+# The script outputs the GitHub secrets you need to add
+```
+
+After bootstrap:
+1. Add the secrets to GitHub (Settings > Secrets > Actions)
+2. Uncomment the backend configuration in `providers.tf`
+3. Run `terraform init -migrate-state` to move state to GCS
+4. Push to GitHub - CI/CD handles everything from now on!
+
+---
+
 ## Terraform Structure
 
 ### File Organization
@@ -60,7 +96,7 @@ The `main.tf` file is organized into logical sections:
 
 2. **Least Privilege Access**: Service accounts are granted only the minimum permissions required for pipeline operations.
 
-3. **Environment Isolation**: The naming convention supports multiple environments (dev, staging, prod) with isolated resources.
+3. **Environment Isolation**: The naming convention supports multiple environments (dev, prod) with isolated resources.
 
 4. **Secure CI/CD Integration**: Workload Identity Federation eliminates the need for long-lived service account keys in GitHub Actions.
 
@@ -113,18 +149,33 @@ Terraform state is currently stored locally. For production environments, consid
 | Resource Type | Name/Identifier | Description |
 |---------------|-----------------|-------------|
 | GCP Project | `${project_id_base}-${environment}-${region}-${instance_number}` | Primary project for all resources |
-| Service Account | `${project_id_base}-${environment}-sa-${instance_number}@<project_id>.iam.gserviceaccount.com` | Service account for pipeline operations |
-| GCS Bucket | `${project_id_base}-${environment}-gcs-${region}-${bucket_suffix}` | Data lake storage bucket |
+| Service Account (Pipeline) | `${project_id_base}-${environment}-sa-${instance_number}@<project_id>.iam.gserviceaccount.com` | Service account for CI/CD and infrastructure management |
+| Service Account (Airflow) | `${project_id_base}-${environment}-airflow-${instance_number}@<project_id>.iam.gserviceaccount.com` | Service account for Airflow (GCS read/write only) |
+| GCS Bucket | `${project_id_base}-${environment}-gcs-${region}-${instance_number}` | Data lake storage bucket |
 | Workload Identity Pool | `github-actions-pool` | Identity pool for GitHub Actions |
 | Workload Identity Provider | `github-provider` | OIDC provider for GitHub authentication |
 
 ### IAM Roles Assigned
 
-The service account is granted the following roles:
+#### Pipeline Service Account (CI/CD)
 
+The pipeline service account is granted the following project-level roles:
+
+- `roles/editor` - General project editing permissions
 - `roles/storage.admin` - Full control of GCS resources
-- `roles/bigquery.dataEditor` - Read/write access to BigQuery datasets
-- `roles/bigquery.jobUser` - Permission to run BigQuery jobs
+- `roles/serviceusage.serviceUsageAdmin` - Manage API enablement
+- `roles/iam.serviceAccountAdmin` - Manage service accounts
+- `roles/iam.workloadIdentityPoolAdmin` - Manage WIF pools and providers
+- `roles/resourcemanager.projectIamAdmin` - Manage project IAM policies
+
+#### Airflow Service Account (Local Docker-Compose)
+
+The Airflow service account follows the **principle of least privilege** and is granted **only** bucket-level permissions:
+
+- `roles/storage.objectAdmin` - Read/write/delete objects in the GCS bucket
+- `roles/storage.legacyBucketReader` - List bucket contents
+
+This service account is designed for Apache Airflow running locally via docker-compose. It can **only** read and write to the GCS bucket - no other GCP permissions are granted.
 
 ---
 
@@ -137,9 +188,9 @@ The service account is granted the following roles:
 | `billing_account_id` | string | - | GCP Billing Account ID (required) |
 | `region` | string | `us-central1` | GCP Region |
 | `zone` | string | `us-central1-a` | GCP Zone |
-| `environment` | string | `dev` | Environment name (dev, staging, prod) |
+| `environment` | string | `dev` | Environment name (dev, prod) |
 | `instance_number` | string | `001` | Instance number for uniqueness |
-| `bucket_suffix` | string | `001` | Bucket suffix number for uniqueness |
+| `instance_number` | string | `001` | Instance number for resource naming |
 | `resource_type` | string | `gcs` | Resource discriminator used in bucket naming |
 | `github_repository` | string | - | GitHub repository for Workload Identity Federation (required) |
 
@@ -151,11 +202,13 @@ The service account is granted the following roles:
 |--------|-------------|
 | `project_id` | The GCP project ID |
 | `project_number` | The GCP project number |
-| `service_account_email` | Email of the NYC Taxi service account |
+| `service_account_email` | Email of the pipeline service account (CI/CD) |
+| `airflow_service_account_email` | Email of the Airflow service account (GCS read/write only) |
 | `gcs_bucket_name` | Name of the GCS bucket |
 | `gcs_bucket_url` | URL of the GCS bucket |
 | `workload_identity_provider` | Workload Identity Provider resource name |
 | `workload_identity_pool` | Workload Identity Pool resource name |
+| `airflow_iam_roles_assigned` | IAM roles assigned to the Airflow service account |
 
 ---
 
@@ -181,6 +234,28 @@ Authentication uses Workload Identity Federation (no JSON keys). Configure these
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | Resource name of the Workload Identity Provider (output `workload_identity_provider`) |
 | `GCP_SERVICE_ACCOUNT` | Email of the service account to impersonate (output `service_account_email`) |
 | `GCP_BILLING_ACCOUNT_ID` | Billing account identifier |
+
+#### Setting Up GitHub Secrets
+
+The GitHub secrets aren't set up yet. You need to add them to your repository.
+
+**Step 1:** Go to GitHub → Settings → Secrets and variables → Actions → New repository secret
+
+**Step 2:** Add these secrets:
+
+| Secret Name | How to get the value |
+|-------------|----------------------|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Run: `terraform output workload_identity_provider` |
+| `GCP_SERVICE_ACCOUNT` | Run: `terraform output service_account_email` |
+| `GCP_BILLING_ACCOUNT_ID` | Your GCP billing account ID |
+
+**Step 3:** Get the values locally:
+
+```bash
+cd terraform
+terraform output workload_identity_provider
+terraform output service_account_email
+```
 
 ### Manual Deployment
 

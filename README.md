@@ -21,11 +21,12 @@ A production-ready PySpark ETL pipeline for processing NYC Taxi & Limousine Comm
 ### Additional Documentation
 
 - [Architecture Details](docs/ARCHITECTURE.md)
+- [Authentication Guide](docs/AUTHENTICATION.md)
 - [Dataset Explanation](docs/DATASET.md)
 - [Data Model and Schema](docs/DATA_MODEL.md)
 - [Historical Strategy](docs/HISTORICAL_STRATEGY.md)
 - [Local Setup Guide](docs/LOCAL_SETUP.md)
-- [Terraform Infrastructure](terraform/README.md)
+- [Terraform Reference](terraform/README.md)
 
 ## Architecture
 
@@ -68,7 +69,7 @@ The project includes Terraform configuration for automated GCP infrastructure pr
 
 - **GCP Project** with billing configuration
 - **Service Account** for pipeline operations
-- **GCS Bucket** for data lake storage (pattern: `${project_id_base}-${environment}-gcs-${region}-${bucket_suffix}`)
+- **GCS Bucket** for data lake storage (pattern: `${project_id_base}-${environment}-gcs-${region}-${instance_number}`)
 - **Workload Identity Federation** for secure GitHub Actions authentication
 - **IAM Roles** for storage and BigQuery access
 
@@ -101,53 +102,75 @@ See [terraform/README.md](terraform/README.md) for detailed infrastructure docum
 git clone https://github.com/arturogonzalezm/nyc-taxi-etl
 cd nyc-taxi-etl
 
+# For dev env and run locally switch to develop/gcp-organisation branch
+git checkout develop/gcp-organisation
+
+# For prod env and run in GCP switch to main branch
+git checkout main
+
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install ".[dev]"
-
-# Initialize environment
-make init
 ```
 
-### 2. Start Services
+### 2. GCP Infrastructure
 
 ```bash
-# Start PostgreSQL
+# Generate .env and terraform.tfvars from config
+./scripts/generate-env.sh
+
+# Provision GCP project, service accounts, and GCS bucket
+cd terraform
+terraform init
+terraform apply
+cd ..
+```
+
+### 3. Authenticate and Start
+
+```bash
+# Set up GCP authentication (service account impersonation)
+make setup
+
+# Start all services (PostgreSQL + Airflow)
 make up
 ```
 
 Services available:
 
+- Airflow UI: [http://localhost:8080](http://localhost:8080) (admin/admin)
 - PostgreSQL: localhost:5432
 
-### 3. Run the Pipeline
+### 4. Run the Pipeline
+
+Trigger DAGs from the Airflow UI, or run manually:
 
 ```bash
 # Ingest a single month of yellow taxi data
-python -m etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --month 1
+python -m dev.etl.jobs.bronze.taxi_ingestion_job --taxi-type yellow --year 2024 --month 1
 
 # Transform to dimensional model
-python -m etl.jobs.gold.taxi_gold_job --taxi-type yellow --year 2024 --month 1
+python -m dev.etl.jobs.gold.taxi_gold_job --taxi-type yellow --year 2024 --month 1
 
 # Load to PostgreSQL
-python -m etl.jobs.load.postgres_load_job --taxi-type yellow --year 2024 --month 1
+python -m dev.etl.jobs.load.postgres_load_job --taxi-type yellow --year 2024 --month 1
 ```
 
-### 4. Query the Data
+### 5. Query the Data
 
 ```bash
 # Connect to PostgreSQL
-make postgres-shell
+make bigquery-shell
 
 # Sample queries
 SELECT COUNT(*) FROM taxi.fact_trip;
 SELECT * FROM taxi.dim_location LIMIT 10;
 ```
 
-### 5. Stop Services
+### 6. Stop Services
 
 ```bash
 make down
@@ -161,19 +184,19 @@ Downloads raw parquet files from NYC TLC and stores them in GCS with metadata co
 
 ```bash
 # Single month
-python -m etl.jobs.bronze.taxi_ingestion_job \
+python -m dev.etl.jobs.bronze.taxi_ingestion_job \
     --taxi-type yellow \
     --year 2024 \
     --month 1
 
 # Bulk ingestion (date range)
-python -m etl.jobs.bronze.taxi_ingestion_job \
+python -m dev.etl.jobs.bronze.taxi_ingestion_job \
     --taxi-type yellow \
     --start-year 2023 --start-month 1 \
     --end-year 2023 --end-month 12
 
 # Green taxi data
-python -m etl.jobs.bronze.taxi_ingestion_job \
+python -m dev.etl.jobs.bronze.taxi_ingestion_job \
     --taxi-type green \
     --year 2024 \
     --month 1
@@ -184,7 +207,7 @@ python -m etl.jobs.bronze.taxi_ingestion_job \
 Ingests the taxi zone lookup CSV for location dimension.
 
 ```bash
-python -m etl.jobs.bronze.zone_lookup_ingestion_job
+python -m dev.etl.jobs.misc.zone_lookup_ingestion_job
 ```
 
 ### Gold Layer (Transformation)
@@ -193,13 +216,13 @@ Transforms bronze data into a dimensional model with data quality checks.
 
 ```bash
 # Single month
-python -m etl.jobs.gold.taxi_gold_job \
+python -m dev.etl.jobs.gold.taxi_gold_job \
     --taxi-type yellow \
     --year 2024 \
     --month 1
 
 # Date range
-python -m etl.jobs.gold.taxi_gold_job \
+python -m dev.etl.jobs.gold.taxi_gold_job \
     --taxi-type yellow \
     --year 2023 --month 1 \
     --end-year 2023 --end-month 6
@@ -211,10 +234,10 @@ Loads the dimensional model into PostgreSQL using idempotent upserts.
 
 ```bash
 # Load all data for a taxi type
-python -m etl.jobs.load.postgres_load_job --taxi-type yellow
+python -m dev.etl.jobs.load.postgres_load_job --taxi-type yellow
 
 # Load specific month
-python -m etl.jobs.load.postgres_load_job \
+python -m dev.etl.jobs.load.postgres_load_job \
     --taxi-type yellow \
     --year 2024 \
     --month 1
@@ -226,13 +249,13 @@ For re-processing historical data without duplicates:
 
 ```bash
 # Backfill specific months
-python etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2023-03 2023-07
+python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2023-03 2023-07
 
 # Backfill a range
-python etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2023-01:2023-12
+python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2023-01:2023-12
 
 # Skip deletion (keep existing data)
-python etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2024-01 --no-delete
+python dev/etl/jobs/bronze/taxi_injection_safe_backfill_job.py yellow 2024-01 --no-delete
 ```
 
 ## Makefile Commands
@@ -268,23 +291,30 @@ make help
 
 ```
 nyc-taxi-etl/
-├── etl/
-│   ├── jobs/
-│   │   ├── base_job.py              # Abstract base class (Template Method pattern)
-│   │   ├── bronze/
-│   │   │   ├── taxi_ingestion_job.py           # NYC taxi data ingestion
-│   │   │   ├── taxi_injection_safe_backfill_job.py  # Safe historical backfill
-│   │   │   └── zone_lookup_ingestion_job.py    # Zone lookup reference data
-│   │   ├── gold/
-│   │   │   └── taxi_gold_job.py     # Dimensional model transformation
-│   │   ├── load/
-│   │   │   └── postgres_load_job.py # PostgreSQL loader
-│   │   └── utils/
-│   │       ├── config.py            # Configuration (Singleton pattern)
-│   │       └── spark_manager.py     # Spark session management
-│   └── __init__.py
+├── dev/                             # Development environment
+│   ├── dags/                        # Airflow DAGs
+│   │   ├── taxi_ingestion_dag.py    # Bronze layer ingestion DAG
+│   │   ├── taxi_gold_dag.py         # Gold layer transformation DAG
+│   │   ├── postgres_load_dag.py     # PostgreSQL load DAG
+│   │   └── zone_lookup_ingestion_dag.py  # Zone lookup ingestion DAG
+│   └── etl/
+│       ├── jobs/
+│       │   ├── base_job.py          # Abstract base class (Template Method pattern)
+│       │   ├── bronze/
+│       │   │   ├── taxi_ingestion_job.py           # NYC taxi data ingestion
+│       │   │   └── taxi_injection_safe_backfill_job.py  # Safe historical backfill
+│       │   ├── misc/
+│       │   │   └── zone_lookup_ingestion_job.py    # Zone lookup reference data
+│       │   ├── gold/
+│       │   │   └── taxi_gold_job.py # Dimensional model transformation
+│       │   ├── load/
+│       │   │   └── postgres_load_job.py # PostgreSQL loader
+│       │   └── utils/
+│       │       ├── config.py        # Configuration (Singleton pattern)
+│       │       └── spark_manager.py # Spark session management
+│       └── __init__.py
 ├── terraform/                       # GCP infrastructure (Terraform)
-├── tests/                           # Unit tests (374+ tests, 54%+ coverage)
+├── tests/                           # Unit tests (458+ tests, 54%+ coverage)
 ├── sql/
 │   └── postgres/
 │       └── create_dimensional_model.sql  # PostgreSQL schema DDL
@@ -312,14 +342,14 @@ The PostgreSQL loader uses hash-based upserts to ensure idempotency:
 
 ## Testing
 
-The project includes comprehensive unit tests with 374+ tests and 54%+ code coverage.
+The project includes comprehensive unit tests with 458+ tests and 54%+ code coverage.
 
 ```bash
 # Run all tests
 pytest tests/ -v
 
 # Run with coverage
-pytest tests/ -v --cov=etl --cov-report=term
+pytest tests/ -v --cov=dev.etl --cov-report=term
 
 # Run specific test file
 pytest tests/test_base_job.py -v
@@ -329,11 +359,11 @@ pytest tests/test_base_job.py -v
 
 ```bash
 # Format code
-black etl/ tests/
+black dev/etl/ tests/
 
 # Lint
-flake8 etl/ --max-line-length=100 --ignore=E501,W503
-pylint etl/
+flake8 dev/etl/ --max-line-length=100 --ignore=E501,W503
+pylint dev/etl/
 ```
 
 ## Environment Variables
@@ -345,7 +375,7 @@ Configure via environment variables or a secrets manager.
 | Variable | Description | Default |
 |----------|-------------|----------|
 | `STORAGE_BACKEND` | Storage backend (`gcs`) | `gcs` |
-| `GCS_BUCKET` | GCS bucket name | Set via `.env` (pattern: `${project_id_base}-${environment}-gcs-${region}-${bucket_suffix}`) |
+| `GCS_BUCKET` | GCS bucket name | Set via `.env` (pattern: `${project_id_base}-${environment}-gcs-${region}-${instance_number}`) |
 | `GCP_PROJECT_ID` | GCP project ID | Set via `.env` (pattern: `${project_id_base}-${environment}-${region}-${instance_number}`) |
 
 ### Database Configuration

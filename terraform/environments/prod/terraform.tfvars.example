@@ -1,0 +1,23 @@
+# =============================================================================
+# PRODUCTION ENVIRONMENT - TERRAFORM VARIABLES
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your values
+
+# GCP Project ID (must already exist or be created by root terraform)
+project_id = "nyc-taxi-etl-prod-001"
+
+# Region and Zone
+region = "us-central1"
+zone   = "us-central1-a"
+
+# Environment
+environment     = "prod"
+project_id_base = "nyc-taxi-etl"
+
+# Cloud Composer image version
+# See: https://cloud.google.com/composer/docs/concepts/versioning/composer-versions
+composer_image_version = "composer-2.9.7-airflow-2.9.3"
+
+# ETL Container Image (leave empty for initial deployment, update after building)
+# Format: {region}-docker.pkg.dev/{project_id}/{repository}/{image}:{tag}
+etl_container_image = ""

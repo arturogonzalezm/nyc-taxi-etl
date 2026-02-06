@@ -5,9 +5,13 @@ Extended tests for TaxiGoldJob to improve coverage.
 import pytest
 from unittest.mock import patch, MagicMock
 
-from etl.jobs.gold.taxi_gold_job import TaxiGoldJob, DataQualityError, run_gold_job
-from etl.jobs.base_job import BaseSparkJob, JobExecutionError
-from etl.jobs.utils.config import JobConfig
+from environments.dev.etl.jobs.gold.taxi_gold_job import (
+    TaxiGoldJob,
+    DataQualityError,
+    run_gold_job,
+)
+from environments.dev.etl.jobs.base_job import BaseSparkJob, JobExecutionError
+from environments.dev import JobConfig
 
 
 class TestTaxiGoldJobInheritance:
@@ -315,22 +319,34 @@ class TestTaxiGoldJobLoadMethod:
         """Test load accepts dimensional model dictionary."""
         job = TaxiGoldJob("yellow", 2024, 6)
 
-        # Create mock DataFrames with proper write chain
-        def create_mock_df():
+        # Create mock DataFrames with proper write chain and caching support
+        def create_mock_df(is_fact=False):
             mock_df = MagicMock()
             mock_df.count.return_value = 100
+            # Support caching
+            mock_df.cache.return_value = mock_df
+            mock_df.unpersist.return_value = mock_df
+            # Support write chain
             mock_writer = MagicMock()
             mock_df.write = mock_writer
             mock_writer.mode.return_value = mock_writer
             mock_writer.option.return_value = mock_writer
+            mock_writer.partitionBy.return_value = mock_writer
             mock_writer.parquet = MagicMock()
+            if is_fact:
+                # Fact table needs select for partition info
+                # and filter for validation
+                select_rv = mock_df.select.return_value
+                select_rv.distinct.return_value.collect.return_value = []
+                mock_df.filter.return_value.count.return_value = 0
+                mock_df.filter.return_value.limit.return_value.count.return_value = 0
             return mock_df
 
         dimensional_model = {
             "dim_date": create_mock_df(),
             "dim_location": create_mock_df(),
             "dim_payment": create_mock_df(),
-            "fact_trip": create_mock_df(),
+            "fact_trip": create_mock_df(is_fact=True),
         }
 
         # Should not raise
@@ -340,24 +356,43 @@ class TestTaxiGoldJobLoadMethod:
         """Test load writes DataFrames to gold layer."""
         job = TaxiGoldJob("yellow", 2024, 6)
 
-        mock_df = MagicMock()
-        mock_df.count.return_value = 50
-        mock_writer = MagicMock()
-        mock_df.write = mock_writer
-        mock_writer.mode.return_value = mock_writer
-        mock_writer.option.return_value = mock_writer
+        # Create mock DataFrames with proper caching and write chain support
+        def create_mock_df(is_fact=False):
+            mock_df = MagicMock()
+            mock_df.count.return_value = 50
+            # Support caching
+            mock_df.cache.return_value = mock_df
+            mock_df.unpersist.return_value = mock_df
+            # Support write chain
+            mock_writer = MagicMock()
+            mock_df.write = mock_writer
+            mock_writer.mode.return_value = mock_writer
+            mock_writer.option.return_value = mock_writer
+            mock_writer.partitionBy.return_value = mock_writer
+            mock_writer.parquet = MagicMock()
+            if is_fact:
+                # Fact table needs select for partition info
+                # and filter for validation
+                select_rv = mock_df.select.return_value
+                select_rv.distinct.return_value.collect.return_value = []
+                mock_df.filter.return_value.count.return_value = 0
+                mock_df.filter.return_value.limit.return_value.count.return_value = 0
+            return mock_df
+
+        fact_mock = create_mock_df(is_fact=True)
+        dim_mock = create_mock_df()
 
         dimensional_model = {
-            "dim_date": mock_df,
-            "dim_location": mock_df,
-            "dim_payment": mock_df,
-            "fact_trip": mock_df,
+            "dim_date": dim_mock,
+            "dim_location": dim_mock,
+            "dim_payment": dim_mock,
+            "fact_trip": fact_mock,
         }
 
         job.load(dimensional_model)
 
-        # Verify write was called
-        assert mock_writer.mode.called
+        # Verify write was called on fact table
+        assert fact_mock.write.mode.called
 
 
 class TestTaxiGoldJobRemoveDuplicates:

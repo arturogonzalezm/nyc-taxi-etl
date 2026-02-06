@@ -6,12 +6,12 @@ import pytest
 
 
 class TestPostgresLoadDag:
-    """Tests for the postgres load DAG."""
+    """Tests for the bigquery load DAG."""
 
     @pytest.fixture
     def dag(self):
         """Load the DAG for testing."""
-        from dags.postgres_load_dag import dag
+        from environments.dev.dags.postgres_load_dag import dag
 
         return dag
 
@@ -37,7 +37,7 @@ class TestPostgresLoadDag:
 
     def test_dag_tags(self, dag):
         """Test DAG has correct tags."""
-        assert set(dag.tags) == {"load", "postgres", "taxi"}
+        assert set(dag.tags) == {"load", "bigquery", "taxi"}
 
     def test_dag_default_args_owner(self, dag):
         """Test default args owner."""
@@ -83,7 +83,7 @@ class TestPostgresLoadDag:
     def test_load_task_bash_command_contains_module(self, dag):
         """Test bash command references correct module."""
         task = dag.get_task("load_to_postgres")
-        assert "etl.jobs.load.postgres_load_job" in task.bash_command
+        assert "environments.dev.etl.jobs.load.postgres_load_job" in task.bash_command
 
     def test_load_task_bash_command_contains_params(self, dag):
         """Test bash command contains taxi_type parameter placeholder."""

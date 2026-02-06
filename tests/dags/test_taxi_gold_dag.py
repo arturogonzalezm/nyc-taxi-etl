@@ -11,7 +11,7 @@ class TestTaxiGoldDag:
     @pytest.fixture
     def dag(self):
         """Load the DAG for testing."""
-        from dags.taxi_gold_dag import dag
+        from environments.dev.dags.taxi_gold_dag import dag
 
         return dag
 
@@ -94,7 +94,7 @@ class TestTaxiGoldDag:
     def test_transform_task_bash_command_contains_module(self, dag):
         """Test bash command references correct module."""
         task = dag.get_task("transform_to_gold")
-        assert "etl.jobs.gold.taxi_gold_job" in task.bash_command
+        assert "environments.dev.etl.jobs.gold.taxi_gold_job" in task.bash_command
 
     def test_transform_task_bash_command_contains_params(self, dag):
         """Test bash command contains all parameter placeholders."""
