@@ -556,3 +556,38 @@ resource "google_service_account_iam_member" "composer_act_as_cloudrun" {
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.composer_sa.email}"
 }
+
+# =============================================================================
+# IAM ROLES - CI/CD SERVICE ACCOUNT (from dev environment)
+# =============================================================================
+# Grant the CI/CD service account permissions to deploy to production
+
+# Artifact Registry Writer - push container images
+resource "google_artifact_registry_repository_iam_member" "cicd_artifact_registry_writer" {
+  project    = var.project_id
+  location   = var.region
+  repository = google_artifact_registry_repository.etl_images.name
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${var.cicd_service_account}"
+}
+
+# Cloud Run Admin - deploy and update Cloud Run services
+resource "google_project_iam_member" "cicd_cloudrun_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${var.cicd_service_account}"
+}
+
+# Service Account User - allow CI/CD to act as Cloud Run SA
+resource "google_service_account_iam_member" "cicd_act_as_cloudrun" {
+  service_account_id = google_service_account.cloud_run_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${var.cicd_service_account}"
+}
+
+# Storage Admin - upload DAGs to Composer bucket
+resource "google_project_iam_member" "cicd_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.admin"
+  member  = "serviceAccount:${var.cicd_service_account}"
+}
