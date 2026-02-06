@@ -76,8 +76,8 @@ variable "cicd_service_account" {
 # =============================================================================
 
 locals {
-  # Full project ID: nyc-taxi-etl-prod-us-central1-003
-  full_project_id = "${var.project_id_base}-${var.environment}-${var.region}-${var.instance_number}"
+  # Full project ID: nyc-taxi-etl-prod-003
+  full_project_id = "${var.project_id_base}-${var.environment}-${var.instance_number}"
 
   # Resource naming convention: {project_id_base}-{environment}-{resource_type}-{region}-{instance}
   composer_name    = "${var.project_id_base}-${var.environment}-composer"
