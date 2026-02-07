@@ -468,22 +468,70 @@ jobs:
       - name: Terraform Apply (Production)
         working-directory: ${{ env.PROD_TF_DIR }}
         id: apply-prod
+        continue-on-error: true
         run: |
           set -o pipefail
           terraform apply -auto-approve tfplan 2>&1 | tee terraform_apply.log
 
-          # Export Terraform outputs for subsequent steps
-          echo "COMPOSER_DAG_BUCKET=$(terraform output -raw composer_dag_gcs_prefix)" >> $GITHUB_ENV
-          echo "CLOUD_RUN_URL=$(terraform output -raw cloud_run_url)" >> $GITHUB_ENV
-          echo "ARTIFACT_REGISTRY_URL=$(terraform output -raw artifact_registry_url)" >> $GITHUB_ENV
-          echo "GCS_BUCKET=$(terraform output -raw gcs_bucket)" >> $GITHUB_ENV
+      - name: Detect Infrastructure Changes
+        id: detect-changes
+        working-directory: ${{ env.PROD_TF_DIR }}
+        run: |
+          # Determine what terraform did
+          APPLY_OUTCOME="${{ steps.apply-prod.outcome }}"
+
+          # Try to read outputs from state (works even if apply failed but state exists)
+          COMPOSER_DAG_BUCKET=$(terraform output -raw composer_dag_gcs_prefix 2>/dev/null || echo '')
+          CLOUD_RUN_URL=$(terraform output -raw cloud_run_url 2>/dev/null || echo '')
+          ARTIFACT_REGISTRY_URL=$(terraform output -raw artifact_registry_url 2>/dev/null || echo '')
+          GCS_BUCKET=$(terraform output -raw gcs_bucket 2>/dev/null || echo '')
+
+          # Export outputs to env
+          echo "COMPOSER_DAG_BUCKET=${COMPOSER_DAG_BUCKET}" >> $GITHUB_ENV
+          echo "CLOUD_RUN_URL=${CLOUD_RUN_URL}" >> $GITHUB_ENV
+          echo "ARTIFACT_REGISTRY_URL=${ARTIFACT_REGISTRY_URL}" >> $GITHUB_ENV
+          echo "GCS_BUCKET=${GCS_BUCKET}" >> $GITHUB_ENV
+
+          # Check if infra already exists by verifying key outputs are present
+          if [ -n "$COMPOSER_DAG_BUCKET" ] && [ -n "$CLOUD_RUN_URL" ] && [ -n "$ARTIFACT_REGISTRY_URL" ]; then
+            INFRA_EXISTS=true
+          else
+            INFRA_EXISTS=false
+          fi
+
+          # Analyse terraform apply log to detect what changed
+          INFRA_CREATED=false
+          INFRA_UPDATED=false
+          if [ "$APPLY_OUTCOME" == "success" ]; then
+            if grep -q "Apply complete! Resources: 0 added, 0 changed, 0 destroyed" terraform_apply.log; then
+              echo "::notice::No infrastructure changes detected — skipping deploy steps"
+              echo "infra_changed=false" >> $GITHUB_OUTPUT
+            else
+              echo "::notice::Infrastructure was created or updated"
+              echo "infra_changed=true" >> $GITHUB_OUTPUT
+              # Check if new IAM bindings were created (need propagation wait)
+              if grep -qE '(google_project_iam|google_service_account|google_storage_bucket_iam|iam_member|iam_binding).*: Creation complete' terraform_apply.log; then
+                INFRA_CREATED=true
+              fi
+            fi
+          elif [ "$INFRA_EXISTS" == "true" ]; then
+            echo "::warning::Terraform apply failed but infrastructure exists in state — proceeding with deploy"
+            echo "infra_changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Terraform apply failed and infrastructure does not exist"
+            exit 1
+          fi
+
+          echo "infra_exists=${INFRA_EXISTS}" >> $GITHUB_OUTPUT
+          echo "iam_created=${INFRA_CREATED}" >> $GITHUB_OUTPUT
 
       # =========================================================================
       # STEP 2: Build and Push ETL Container Image
       # =========================================================================
       - name: Wait for IAM propagation
+        if: steps.detect-changes.outputs.iam_created == 'true'
         run: |
-          echo "Waiting 60s for IAM bindings to propagate across GCP..."
+          echo "New IAM bindings detected — waiting 60s for propagation..."
           sleep 60
 
       - name: Set up Docker Buildx
@@ -497,18 +545,18 @@ jobs:
         run: |
           IMAGE_TAG="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:${{ github.sha }}"
           IMAGE_LATEST="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:latest"
-          
+
           echo "Building ETL container image..."
           docker build \
             -t "$IMAGE_TAG" \
             -t "$IMAGE_LATEST" \
             -f environments/prod/etl/Dockerfile \
             .
-          
+
           echo "Pushing ETL container image..."
           docker push "$IMAGE_TAG"
           docker push "$IMAGE_LATEST"
-          
+
           echo "ETL_IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
       - name: Update Cloud Run with new image
@@ -539,7 +587,7 @@ jobs:
               gcloud storage cp "$dag_file" "${DAG_GCS_PREFIX}/${dag_name}"
             fi
           done
-          
+
           echo "✓ DAGs deployed successfully"
 
       # =========================================================================
@@ -551,9 +599,9 @@ jobs:
           echo "============================================="
           echo "Production Infrastructure Verification"
           echo "============================================="
-          
+
           INFRA_OK=true
-          
+
           # Check Cloud Composer
           if gcloud composer environments describe nyc-taxi-etl-prod-composer \
               --location=${{ env.REGION }} \
@@ -563,7 +611,7 @@ jobs:
             echo "✗ Cloud Composer environment missing"
             INFRA_OK=false
           fi
-          
+
           # Check Cloud Run service
           if gcloud run services describe nyc-taxi-etl-prod-etl-runner \
               --region=${{ env.REGION }} \
@@ -574,7 +622,7 @@ jobs:
             echo "✗ Cloud Run service missing"
             INFRA_OK=false
           fi
-          
+
           # Check GCS bucket
           if gsutil ls -b "gs://${{ env.GCS_BUCKET }}" &>/dev/null; then
             echo "✓ GCS bucket exists: ${{ env.GCS_BUCKET }}"
@@ -582,7 +630,7 @@ jobs:
             echo "✗ GCS bucket missing"
             INFRA_OK=false
           fi
-          
+
           # Check BigQuery dataset
           if bq show --project_id=${{ env.PROD_PROJECT_ID }} taxi &>/dev/null; then
             echo "✓ BigQuery dataset 'taxi' exists"
@@ -590,7 +638,7 @@ jobs:
             echo "✗ BigQuery dataset missing"
             INFRA_OK=false
           fi
-          
+
           # Check Artifact Registry
           if gcloud artifacts repositories describe nyc-taxi-etl-prod-etl-images \
               --location=${{ env.REGION }} \
@@ -600,14 +648,14 @@ jobs:
             echo "✗ Artifact Registry repository missing"
             INFRA_OK=false
           fi
-          
+
           echo "============================================="
-          
+
           if [ "$INFRA_OK" == "true" ]; then
-            echo "::notice::Production deployment successful - all infrastructure verified"
+            echo "::notice::Production deployment successful — all infrastructure verified"
             echo "status=success" >> $GITHUB_OUTPUT
           else
-            echo "::error::Production deployment incomplete - some infrastructure is missing"
+            echo "::error::Production deployment incomplete — some infrastructure is missing"
             echo "status=partial" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -622,6 +670,8 @@ jobs:
           echo "Project ID: ${{ env.PROD_PROJECT_ID }}"
           echo "Region: ${{ env.REGION }}"
           echo "Commit: ${{ github.sha }}"
+          echo "Terraform: ${{ steps.apply-prod.outcome }}"
+          echo "Infra changed: ${{ steps.detect-changes.outputs.infra_changed }}"
           echo ""
           echo "Resources:"
           echo "  - Cloud Composer: nyc-taxi-etl-prod-composer"
