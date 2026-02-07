@@ -42,13 +42,13 @@ RUN curl -L --retry 3 --retry-delay 5 -o /opt/spark/jars/gcs-connector-hadoop3-2
     https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.25.jar
 
 # Copy project files
-COPY environments/dev/ ./environments/dev/
+COPY environments/prod/ ./environments/prod/
 
 # Install package in editable mode (fast, deps already installed)
 RUN pip install --no-cache-dir --no-deps -e .
 
 # Set Python path
-ENV PYTHONPATH=/app:/app/environments/dev
+ENV PYTHONPATH=/app:/app/environments/prod
 
 # Cloud Run HTTP entrypoint - listens on $PORT (default 8080)
 CMD ["python", "-m", "environments.prod.etl.server"]
