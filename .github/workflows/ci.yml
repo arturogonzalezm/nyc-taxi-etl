@@ -524,15 +524,14 @@ jobs:
         run: |
           echo "Deploying DAGs to Cloud Composer..."
           
-          # Extract bucket name from gs:// prefix path
-          DAG_BUCKET=$(echo "${{ env.COMPOSER_DAG_BUCKET }}" | sed 's|gs://||' | cut -d'/' -f1)
-          DAG_PATH=$(echo "${{ env.COMPOSER_DAG_BUCKET }}" | sed 's|gs://[^/]*/||')
-          
-          # Upload all production DAGs
+          DAG_GCS_PREFIX="${{ env.COMPOSER_DAG_BUCKET }}"
+
+          # Upload all production DAGs using gcloud storage (modern replacement for gsutil)
           for dag_file in environments/prod/dags/*.py; do
             if [ -f "$dag_file" ] && [ "$(basename $dag_file)" != "__init__.py" ]; then
-              echo "Uploading $(basename $dag_file)..."
-              gsutil cp "$dag_file" "${{ env.COMPOSER_DAG_BUCKET }}/"
+              dag_name="$(basename $dag_file)"
+              echo "Uploading ${dag_name}..."
+              gcloud storage cp "$dag_file" "${DAG_GCS_PREFIX}/${dag_name}"
             fi
           done
           
