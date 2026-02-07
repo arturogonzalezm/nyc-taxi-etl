@@ -171,7 +171,7 @@ resource "google_compute_router_nat" "etl_nat" {
 
 # VPC Connector for Cloud Run
 resource "google_vpc_access_connector" "etl_connector" {
-  name          = "${var.project_id_base}-${var.environment}-vpc-conn"
+  name          = "${var.project_id_base}-${var.environment}-vpc"
   project       = google_project.prod_project.project_id
   region        = var.region
   network       = google_compute_network.etl_vpc.id
