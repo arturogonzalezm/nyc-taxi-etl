@@ -509,8 +509,8 @@ jobs:
             else
               echo "::notice::Infrastructure was created or updated"
               echo "infra_changed=true" >> $GITHUB_OUTPUT
-              # Check if new IAM bindings were created (need propagation wait)
-              if grep -qE '(google_project_iam|google_service_account|google_storage_bucket_iam|iam_member|iam_binding).*: Creation complete' terraform_apply.log; then
+              # Check if new IAM bindings or APIs were created (need propagation wait)
+              if grep -qE '(google_project_iam|google_service_account|google_storage_bucket_iam|iam_member|iam_binding|google_project_service\.).*: Creation complete' terraform_apply.log; then
                 INFRA_CREATED=true
               fi
             fi
@@ -528,11 +528,11 @@ jobs:
       # =========================================================================
       # STEP 2: Build and Push ETL Container Image
       # =========================================================================
-      - name: Wait for IAM propagation
+      - name: Wait for IAM and API propagation
         if: steps.detect-changes.outputs.iam_created == 'true'
         run: |
-          echo "New IAM bindings detected — waiting 60s for propagation..."
-          sleep 60
+          echo "New IAM bindings or APIs detected — waiting 90s for propagation..."
+          sleep 90
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -554,8 +554,20 @@ jobs:
             .
 
           echo "Pushing ETL container image..."
-          docker push "$IMAGE_TAG"
-          docker push "$IMAGE_LATEST"
+          # Retry push up to 3 times (API enablement can take time to propagate)
+          for attempt in 1 2 3; do
+            if docker push "$IMAGE_TAG" && docker push "$IMAGE_LATEST"; then
+              echo "✓ Push succeeded on attempt ${attempt}"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Push attempt ${attempt} failed — retrying in 30s..."
+              sleep 30
+            else
+              echo "::error::Push failed after 3 attempts"
+              exit 1
+            fi
+          done
 
           echo "ETL_IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
