@@ -528,11 +528,27 @@ jobs:
       # =========================================================================
       # STEP 2: Build and Push ETL Container Image
       # =========================================================================
-      - name: Wait for IAM and API propagation
+      - name: Wait for API and IAM propagation
         if: steps.detect-changes.outputs.iam_created == 'true'
         run: |
-          echo "New IAM bindings or APIs detected — waiting 90s for propagation..."
-          sleep 90
+          echo "New IAM bindings or APIs detected — waiting for Artifact Registry to become available..."
+          AR_REPO="${{ env.ARTIFACT_REGISTRY_URL }}"
+          # Extract registry host (e.g. us-central1-docker.pkg.dev)
+          AR_HOST=$(echo "$AR_REPO" | cut -d'/' -f1)
+
+          # Poll until AR API responds (up to 5 minutes)
+          for i in $(seq 1 20); do
+            if gcloud artifacts repositories describe nyc-taxi-etl-prod-etl-images \
+                --location=${{ env.REGION }} \
+                --project=${{ env.PROD_PROJECT_ID }} &>/dev/null; then
+              echo "✓ Artifact Registry API is ready (attempt ${i})"
+              # Extra buffer for Docker auth token propagation
+              sleep 15
+              break
+            fi
+            echo "  Waiting for Artifact Registry API... (attempt ${i}/20)"
+            sleep 15
+          done
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -554,17 +570,17 @@ jobs:
             .
 
           echo "Pushing ETL container image..."
-          # Retry push up to 3 times (API enablement can take time to propagate)
-          for attempt in 1 2 3; do
+          # Retry push up to 5 times with 60s backoff (API propagation can take several minutes)
+          for attempt in 1 2 3 4 5; do
             if docker push "$IMAGE_TAG" && docker push "$IMAGE_LATEST"; then
               echo "✓ Push succeeded on attempt ${attempt}"
               break
             fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "::warning::Push attempt ${attempt} failed — retrying in 30s..."
-              sleep 30
+            if [ "$attempt" -lt 5 ]; then
+              echo "::warning::Push attempt ${attempt} failed — retrying in 60s..."
+              sleep 60
             else
-              echo "::error::Push failed after 3 attempts"
+              echo "::error::Push failed after 5 attempts"
               exit 1
             fi
           done
