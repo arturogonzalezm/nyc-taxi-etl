@@ -26,7 +26,7 @@ COPY --from=spark-base /opt/spark/python/lib /opt/spark/python/lib
 
 # Set Spark environment
 ENV SPARK_HOME=/opt/spark
-ENV PYTHONPATH="${PYTHONPATH}:/opt/spark/python/lib/py4j-0.10.9.9-src.zip"
+# Note: PYTHONPATH is set after WORKDIR to include both /app and py4j
 
 # Set working directory
 WORKDIR /app
@@ -41,14 +41,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN curl -L --retry 3 --retry-delay 5 -o /opt/spark/jars/gcs-connector-hadoop3-2.2.25.jar \
     https://storage.googleapis.com/hadoop-lib/gcs/gcs-connector-hadoop3-2.2.25.jar
 
-# Copy project files
-COPY environments/dev/ ./environments/dev/
+# Copy project files (include top-level __init__.py for namespace resolution)
+COPY environments/__init__.py ./environments/__init__.py
+COPY environments/prod/ ./environments/prod/
 
-# Install package in editable mode (fast, deps already installed)
-RUN pip install --no-cache-dir --no-deps -e .
+# Install package (non-editable, deps already installed)
+RUN pip install --no-cache-dir --no-deps .
 
 # Set Python path
-ENV PYTHONPATH=/app:/app/environments/dev
+ENV PYTHONPATH="/app:/opt/spark/python/lib/py4j-0.10.9.9-src.zip"
 
 # Cloud Run HTTP entrypoint - listens on $PORT (default 8080)
 CMD ["python", "-m", "environments.prod.etl.server"]
