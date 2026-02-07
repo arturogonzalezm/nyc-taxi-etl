@@ -469,13 +469,14 @@ jobs:
         working-directory: ${{ env.PROD_TF_DIR }}
         id: apply-prod
         run: |
+          set -o pipefail
           terraform apply -auto-approve tfplan 2>&1 | tee terraform_apply.log
-          
+
           # Export Terraform outputs for subsequent steps
-          echo "COMPOSER_DAG_BUCKET=$(terraform output -raw composer_dag_gcs_prefix 2>/dev/null || echo '')" >> $GITHUB_ENV
-          echo "CLOUD_RUN_URL=$(terraform output -raw cloud_run_url 2>/dev/null || echo '')" >> $GITHUB_ENV
-          echo "ARTIFACT_REGISTRY_URL=$(terraform output -raw artifact_registry_url 2>/dev/null || echo '')" >> $GITHUB_ENV
-          echo "GCS_BUCKET=$(terraform output -raw gcs_bucket 2>/dev/null || echo '')" >> $GITHUB_ENV
+          echo "COMPOSER_DAG_BUCKET=$(terraform output -raw composer_dag_gcs_prefix)" >> $GITHUB_ENV
+          echo "CLOUD_RUN_URL=$(terraform output -raw cloud_run_url)" >> $GITHUB_ENV
+          echo "ARTIFACT_REGISTRY_URL=$(terraform output -raw artifact_registry_url)" >> $GITHUB_ENV
+          echo "GCS_BUCKET=$(terraform output -raw gcs_bucket)" >> $GITHUB_ENV
 
       # =========================================================================
       # STEP 2: Build and Push ETL Container Image
@@ -523,8 +524,12 @@ jobs:
       - name: Deploy DAGs to Cloud Composer
         run: |
           echo "Deploying DAGs to Cloud Composer..."
-          
+
           DAG_GCS_PREFIX="${{ env.COMPOSER_DAG_BUCKET }}"
+          if [ -z "$DAG_GCS_PREFIX" ]; then
+            echo "::error::COMPOSER_DAG_BUCKET is empty — terraform output composer_dag_gcs_prefix failed"
+            exit 1
+          fi
 
           # Upload all production DAGs using gcloud storage (modern replacement for gsutil)
           for dag_file in environments/prod/dags/*.py; do
