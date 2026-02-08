@@ -67,7 +67,10 @@ resource "google_project_service" "composer" {
   service            = "composer.googleapis.com"
   disable_on_destroy = false
 
-  depends_on = [google_project_service.cloudresourcemanager]
+  depends_on = [
+    google_project_service.cloudresourcemanager,
+    google_project_service.serviceusage,
+  ]
 }
 
 resource "google_project_service" "cloudrun" {
@@ -75,7 +78,10 @@ resource "google_project_service" "cloudrun" {
   service            = "run.googleapis.com"
   disable_on_destroy = false
 
-  depends_on = [google_project_service.cloudresourcemanager]
+  depends_on = [
+    google_project_service.cloudresourcemanager,
+    google_project_service.serviceusage,
+  ]
 }
 
 resource "google_project_service" "bigquery" {
@@ -83,7 +89,10 @@ resource "google_project_service" "bigquery" {
   service            = "bigquery.googleapis.com"
   disable_on_destroy = false
 
-  depends_on = [google_project_service.cloudresourcemanager]
+  depends_on = [
+    google_project_service.cloudresourcemanager,
+    google_project_service.serviceusage,
+  ]
 }
 
 resource "google_project_service" "artifactregistry" {
@@ -91,7 +100,10 @@ resource "google_project_service" "artifactregistry" {
   service            = "artifactregistry.googleapis.com"
   disable_on_destroy = false
 
-  depends_on = [google_project_service.cloudresourcemanager]
+  depends_on = [
+    google_project_service.cloudresourcemanager,
+    google_project_service.serviceusage,
+  ]
 }
 
 resource "google_project_service" "cloudbuild" {
@@ -99,7 +111,10 @@ resource "google_project_service" "cloudbuild" {
   service            = "cloudbuild.googleapis.com"
   disable_on_destroy = false
 
-  depends_on = [google_project_service.cloudresourcemanager]
+  depends_on = [
+    google_project_service.cloudresourcemanager,
+    google_project_service.serviceusage,
+  ]
 }
 
 resource "google_project_service" "vpcaccess" {
@@ -107,7 +122,10 @@ resource "google_project_service" "vpcaccess" {
   service            = "vpcaccess.googleapis.com"
   disable_on_destroy = false
 
-  depends_on = [google_project_service.cloudresourcemanager]
+  depends_on = [
+    google_project_service.cloudresourcemanager,
+    google_project_service.serviceusage,
+  ]
 }
 
 resource "google_project_service" "compute" {
@@ -115,7 +133,10 @@ resource "google_project_service" "compute" {
   service            = "compute.googleapis.com"
   disable_on_destroy = false
 
-  depends_on = [google_project_service.cloudresourcemanager]
+  depends_on = [
+    google_project_service.cloudresourcemanager,
+    google_project_service.serviceusage,
+  ]
 }
 
 # =============================================================================
@@ -476,6 +497,26 @@ resource "google_cloud_run_v2_service" "etl_runner" {
 }
 
 # =============================================================================
+# WAIT FOR API CONSUMER REGISTRATION
+# =============================================================================
+# After enabling APIs on a new project, GCP needs time to register the project
+# as a valid "consumer" for services like Artifact Registry's Docker endpoint.
+# Without this wait, Docker push fails with "Consumer is invalid" even though
+# the API is technically enabled. This only delays on first creation.
+
+resource "time_sleep" "wait_for_api_activation" {
+  create_duration = "120s"
+
+  depends_on = [
+    google_project_service.artifactregistry,
+    google_project_service.cloudrun,
+    google_project_service.composer,
+    google_project_service.bigquery,
+    google_project_service.compute,
+  ]
+}
+
+# =============================================================================
 # ARTIFACT REGISTRY (FOR CONTAINER IMAGES)
 # =============================================================================
 
@@ -488,7 +529,7 @@ resource "google_artifact_registry_repository" "etl_images" {
 
   labels = local.common_labels
 
-  depends_on = [google_project_service.artifactregistry]
+  depends_on = [time_sleep.wait_for_api_activation]
 }
 
 # =============================================================================
