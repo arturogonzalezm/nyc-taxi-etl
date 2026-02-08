@@ -536,7 +536,6 @@ jobs:
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Wait for Artifact Registry to accept pushes
-        if: steps.detect-changes.outputs.infra_changed == 'true'
         run: |
           echo "Waiting for Artifact Registry Docker endpoint to become ready..."
           REGISTRY="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner"
