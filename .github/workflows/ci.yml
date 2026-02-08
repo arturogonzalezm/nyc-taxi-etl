@@ -535,28 +535,32 @@ jobs:
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Verify Artifact Registry is accessible
+      - name: Ensure Artifact Registry is ready for Docker pushes
         run: |
-          echo "Verifying Artifact Registry Docker endpoint..."
+          echo "Ensuring Artifact Registry consumer registration..."
 
-          # Terraform includes a 120s wait after API enablement for consumer registration.
-          # This step does a quick verification with retries as a safety net.
-          for attempt in 1 2 3 4 5; do
+          # Force re-enable AR API to trigger consumer registration
+          # (idempotent if already enabled; fixes "Consumer is invalid" on new projects)
+          gcloud services enable artifactregistry.googleapis.com \
+            --project=${{ env.PROD_PROJECT_ID }} || true
+
+          # Verify the AR repository exists via gcloud
+          for attempt in $(seq 1 10); do
             if gcloud artifacts repositories describe nyc-taxi-etl-prod-etl-images \
                 --location=${{ env.REGION }} \
                 --project=${{ env.PROD_PROJECT_ID }} &>/dev/null; then
-              echo "✓ Artifact Registry repo is accessible"
+              echo "✓ Artifact Registry repo is accessible (attempt ${attempt})"
               break
             fi
-            if [ "$attempt" -eq 5 ]; then
-              echo "::error::Artifact Registry repo not accessible"
+            if [ "$attempt" -eq 10 ]; then
+              echo "::error::Artifact Registry repo not accessible after all retries"
               exit 1
             fi
-            echo "  Waiting for Artifact Registry... (attempt ${attempt}/5)"
+            echo "  Waiting for Artifact Registry repo... (attempt ${attempt}/10)"
             sleep 15
           done
 
-      - name: Build and Push ETL Container
+      - name: Build ETL Container
         run: |
           IMAGE_TAG="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:${{ github.sha }}"
           IMAGE_LATEST="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:latest"
@@ -568,22 +572,28 @@ jobs:
             -f environments/prod/etl/Dockerfile \
             .
 
+          echo "ETL_IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "ETL_IMAGE_LATEST=$IMAGE_LATEST" >> $GITHUB_ENV
+
+      - name: Push ETL Container to Artifact Registry
+        run: |
           echo "Pushing ETL container image..."
-          for attempt in 1 2 3; do
-            if docker push "$IMAGE_TAG" && docker push "$IMAGE_LATEST"; then
+          # Retry with 30s backoff to handle consumer registration propagation.
+          # On new projects, the AR Docker endpoint can take up to 15 minutes
+          # to recognise the project as a valid consumer after API enablement.
+          MAX_ATTEMPTS=30
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            if docker push "${{ env.ETL_IMAGE_TAG }}" && docker push "${{ env.ETL_IMAGE_LATEST }}"; then
               echo "✓ Push succeeded on attempt ${attempt}"
               break
             fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "::warning::Push attempt ${attempt} failed — retrying in 60s..."
-              sleep 60
-            else
-              echo "::error::Push failed after 3 attempts"
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "::error::Push failed after ${MAX_ATTEMPTS} attempts (15 minutes)"
               exit 1
             fi
+            echo "::warning::Push attempt ${attempt} failed — retrying in 30s..."
+            sleep 30
           done
-
-          echo "ETL_IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
       - name: Update Cloud Run with new image
         run: |
