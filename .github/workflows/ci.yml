@@ -528,34 +528,49 @@ jobs:
       # =========================================================================
       # STEP 2: Build and Push ETL Container Image
       # =========================================================================
-      - name: Ensure Artifact Registry API is active
-        run: |
-          echo "Verifying Artifact Registry API on prod project..."
-
-          # Explicitly enable the API on the prod project (idempotent — no-op if already enabled)
-          gcloud services enable artifactregistry.googleapis.com \
-            --project=${{ env.PROD_PROJECT_ID }}
-
-          # Wait until the API is listed as ENABLED (up to 5 minutes)
-          for i in $(seq 1 20); do
-            if gcloud services list --project=${{ env.PROD_PROJECT_ID }} --filter="name:artifactregistry.googleapis.com" --format="value(name)" | grep -q artifactregistry; then
-              echo "✓ Artifact Registry API is enabled (attempt ${i})"
-              break
-            fi
-            echo "  Waiting for API activation... (attempt ${i}/20)"
-            sleep 15
-          done
-
-          # Additional wait for the Docker registry consumer endpoint to sync
-          echo "Waiting 30s for Docker registry consumer endpoint to sync..."
-          sleep 30
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Configure Docker for Artifact Registry
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Wait for Artifact Registry to accept pushes
+        if: steps.detect-changes.outputs.infra_changed == 'true'
+        run: |
+          echo "Waiting for Artifact Registry Docker endpoint to become ready..."
+          REGISTRY="${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner"
+
+          # Create a minimal test image to probe the registry
+          echo "FROM scratch" | docker build -t "${REGISTRY}:probe" -
+
+          for i in $(seq 1 40); do
+            OUTPUT=$(docker push "${REGISTRY}:probe" 2>&1 || true)
+
+            # Success or "manifest invalid" both mean the registry is accepting connections
+            if echo "$OUTPUT" | grep -qiE '(Pushed|digest:|Mounted|already exists)'; then
+              echo "✓ Registry is accepting pushes (attempt ${i})"
+              # Clean up probe tag
+              gcloud artifacts docker tags delete "${REGISTRY}:probe" --quiet 2>/dev/null || true
+              break
+            fi
+
+            # "Consumer invalid" or "denied" means API not propagated yet
+            if echo "$OUTPUT" | grep -qi 'Consumer.*invalid\|PERMISSION_DENIED'; then
+              if [ "$i" -eq 40 ]; then
+                echo "::error::Artifact Registry still not accepting pushes after 10 minutes"
+                echo "$OUTPUT"
+                exit 1
+              fi
+              echo "  Registry not ready yet... (attempt ${i}/40)"
+              sleep 15
+              continue
+            fi
+
+            # Any other response (even errors like "manifest invalid") means the endpoint is up
+            echo "✓ Registry endpoint is responding (attempt ${i})"
+            break
+          done
 
       - name: Build and Push ETL Container
         run: |
@@ -570,20 +585,8 @@ jobs:
             .
 
           echo "Pushing ETL container image..."
-          # Retry push up to 5 times with 60s backoff (API propagation can take several minutes)
-          for attempt in 1 2 3 4 5; do
-            if docker push "$IMAGE_TAG" && docker push "$IMAGE_LATEST"; then
-              echo "✓ Push succeeded on attempt ${attempt}"
-              break
-            fi
-            if [ "$attempt" -lt 5 ]; then
-              echo "::warning::Push attempt ${attempt} failed — retrying in 60s..."
-              sleep 60
-            else
-              echo "::error::Push failed after 5 attempts"
-              exit 1
-            fi
-          done
+          docker push "$IMAGE_TAG"
+          docker push "$IMAGE_LATEST"
 
           echo "ETL_IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 

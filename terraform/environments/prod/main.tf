@@ -655,3 +655,10 @@ resource "google_project_iam_member" "cicd_storage_admin" {
   role    = "roles/storage.admin"
   member  = "serviceAccount:${var.cicd_service_account}"
 }
+
+# Service Usage Admin - allow CI/CD to verify and enable APIs on prod project
+resource "google_project_iam_member" "cicd_serviceusage_admin" {
+  project = google_project.prod_project.project_id
+  role    = "roles/serviceusage.serviceUsageAdmin"
+  member  = "serviceAccount:${var.cicd_service_account}"
+}
