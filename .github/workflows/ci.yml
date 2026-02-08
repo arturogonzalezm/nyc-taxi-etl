@@ -531,22 +531,24 @@ jobs:
       - name: Wait for API and IAM propagation
         if: steps.detect-changes.outputs.iam_created == 'true'
         run: |
-          echo "New IAM bindings or APIs detected — waiting for Artifact Registry to become available..."
-          AR_REPO="${{ env.ARTIFACT_REGISTRY_URL }}"
-          # Extract registry host (e.g. us-central1-docker.pkg.dev)
-          AR_HOST=$(echo "$AR_REPO" | cut -d'/' -f1)
+          echo "New IAM bindings or APIs detected — waiting for Artifact Registry Docker endpoint..."
 
-          # Poll until AR API responds (up to 5 minutes)
-          for i in $(seq 1 20); do
-            if gcloud artifacts repositories describe nyc-taxi-etl-prod-etl-images \
-                --location=${{ env.REGION }} \
-                --project=${{ env.PROD_PROJECT_ID }} &>/dev/null; then
-              echo "✓ Artifact Registry API is ready (attempt ${i})"
-              # Extra buffer for Docker auth token propagation
-              sleep 15
+          # Poll the actual Docker registry endpoint (up to 10 minutes)
+          # gcloud describe may succeed but the Docker push endpoint takes longer
+          for i in $(seq 1 40); do
+            # Test with a lightweight Docker operation against the registry
+            if docker pull "${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:latest" &>/dev/null || \
+               docker manifest inspect "${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:latest" &>/dev/null; then
+              echo "✓ Artifact Registry Docker endpoint is ready (attempt ${i})"
               break
             fi
-            echo "  Waiting for Artifact Registry API... (attempt ${i}/20)"
+            # Also accept "not found" or "manifest unknown" — these mean the registry IS responding
+            OUTPUT=$(docker manifest inspect "${{ env.ARTIFACT_REGISTRY_URL }}/etl-runner:latest" 2>&1 || true)
+            if echo "$OUTPUT" | grep -qiE '(not found|manifest unknown|no such manifest|MANIFEST_UNKNOWN)'; then
+              echo "✓ Artifact Registry Docker endpoint is responding (attempt ${i}) — repo is empty, ready to push"
+              break
+            fi
+            echo "  Waiting for Docker registry endpoint... (attempt ${i}/40)"
             sleep 15
           done
 
